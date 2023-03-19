@@ -1,0 +1,16 @@
+__pycache__
+.DS_Store
+*.egg-info
+
+*.zip
+*.ckpt
+*.pt
+*.pth
+
+/logs
+/temp
+/vis
+/docker
+/kubernetes
+
+/*.sh
