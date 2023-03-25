@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm
 
 from torchvision.transforms import Compose
-import ldm.modules.depth.midas.utils as utils
+from .utils import read_image, write_depth
 from .dpt_depth import DPTDepthModel
 from .midas_net import MidasNet
 from .midas_net_custom import MidasNet_small
@@ -136,7 +136,7 @@ class MiDaS(nn.Module):
             img_input_list = []
             for batch_index_count in range(len(img_name_chunk)):
                 img_name = img_name_chunk[batch_index_count]
-                img = utils.read_image(img_name)
+                img = read_image(img_name)
                 img_input = self.transform({"image": img})["image"][None]
                 img_input_list.append(img_input)
 
@@ -154,7 +154,7 @@ class MiDaS(nn.Module):
                     output_path, 
                     os.path.splitext(os.path.basename(img_name))[0]
                 )
-                utils.write_depth(filename, prediction[batch_index_count], bits=2)
+                write_depth(filename, prediction[batch_index_count], bits=2)
 
         print("finished")
     

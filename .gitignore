@@ -9,8 +9,10 @@ __pycache__
 
 /logs
 /temp
+/unused
 /vis
 /docker
 /kubernetes
+/data/scannet_minival
 
 /*.sh
