@@ -14,5 +14,6 @@ __pycache__
 /docker
 /kubernetes
 /data
+/outputs
 
 /*.sh
