@@ -46,7 +46,7 @@ from nerfstudio.utils.decorators import (
 )
 from nerfstudio.utils.misc import step_check
 from nerfstudio.utils.writer import EventName, TimeWriter
-from nerfstudio.viewer.server import viewer_utils
+# from nerfstudio.viewer.server import viewer_utils
 
 CONSOLE = Console(width=120)
 
@@ -127,7 +127,7 @@ class Trainer:
         self.checkpoint_dir: Path = config.get_checkpoint_dir()
         CONSOLE.log(f"Saving checkpoints to: {self.checkpoint_dir}")
 
-        self.viewer_state = None
+        # self.viewer_state = None
 
     def setup(self, test_mode: Literal["test", "val", "inference"] = "val") -> None:
         """Setup the Trainer by calling other setup functions.
@@ -154,23 +154,23 @@ class Trainer:
         )
 
         # set up viewer if enabled
-        viewer_log_path = self.base_dir / self.config.viewer.relative_log_filename
-        self.viewer_state, banner_messages = None, None
-        if self.config.is_viewer_enabled() and self.local_rank == 0:
-            datapath = self.pipeline.datamanager.get_datapath()
-            if datapath is None:
-                datapath = self.base_dir
-            self.viewer_state, banner_messages = viewer_utils.setup_viewer(
-                self.config.viewer, log_filename=viewer_log_path, datapath=datapath
-            )
-        self._check_viewer_warnings()
+        # viewer_log_path = self.base_dir / self.config.viewer.relative_log_filename
+        # self.viewer_state, banner_messages = None, None
+        # if self.config.is_viewer_enabled() and self.local_rank == 0:
+        #     datapath = self.pipeline.datamanager.get_datapath()
+        #     if datapath is None:
+        #         datapath = self.base_dir
+        #     self.viewer_state, banner_messages = viewer_utils.setup_viewer(
+        #         self.config.viewer, log_filename=viewer_log_path, datapath=datapath
+        #     )
+        # self._check_viewer_warnings()
         # set up writers/profilers if enabled
         writer_log_path = self.base_dir / self.config.logging.relative_log_dir
         writer.setup_event_writer(
             self.config.is_wandb_enabled(), self.config.is_tensorboard_enabled(), log_dir=writer_log_path
         )
         writer.setup_local_writer(
-            self.config.logging, max_iter=self.config.max_num_iterations, banner_messages=banner_messages
+            self.config.logging, max_iter=self.config.max_num_iterations, banner_messages=None# banner_messages
         )
         writer.put_config(name="config", config_dict=dataclasses.asdict(self.config), step=0)
         profiler.setup_profiler(self.config.logging)
@@ -200,7 +200,7 @@ class Trainer:
             self.base_dir / "dataparser_transforms.json"
         )
 
-        self._init_viewer_state()
+        # self._init_viewer_state()
         with TimeWriter(writer, EventName.TOTAL_TRAIN_TIME):
             num_iterations = self.config.max_num_iterations
             step = 0
@@ -230,7 +230,7 @@ class Trainer:
                         avg_over_steps=True,
                     )
 
-                self._update_viewer_state(step)
+                # self._update_viewer_state(step)
 
                 # a batch of train rays
                 if step_check(step, self.config.logging.steps_per_log, run_at_zero=True):
@@ -253,9 +253,9 @@ class Trainer:
 
         CONSOLE.rule()
         CONSOLE.print("[bold green]:tada: :tada: :tada: Training Finished :tada: :tada: :tada:", justify="center")
-        if not self.config.viewer.quit_on_train_completion:
-            CONSOLE.print("Use ctrl+c to quit", justify="center")
-            self._always_render(step)
+        # if not self.config.viewer.quit_on_train_completion:
+        #     CONSOLE.print("Use ctrl+c to quit", justify="center")
+        #     self._always_render(step)
 
     @check_main_thread
     def _always_render(self, step: int) -> None:

@@ -21,6 +21,7 @@ from kornia.geometry.linalg import compose_transformations, \
 
 from modules.midas.model import MiDaS
 from dataset.re10k_simple import RE10KDataset
+from dataset.scannet_simple import ScanNetDataset
 from utils import PIL_utils
 
 
@@ -87,7 +88,7 @@ def warp(image_src, depth_src, pose_src, pose_tgt, camera_matrix, normalize_poin
 def generate_video(dataset, seq_idx, depth_model, pipe, camera_traj=None, loop=True, test=False):
     inpaint_image = None  # reset the inpaint image
     image_save_list = []
-    loop_len = dataset.get_seq_len(seq_idx)-1 if not test else 5
+    loop_len = dataset.get_seq_len(seq_idx)-1 if not test else 1
     for i in range(loop_len):
         example = dataset.get_item(seq_idx, i)
         example_next = dataset.get_item(seq_idx, i+5)
@@ -103,27 +104,11 @@ def generate_video(dataset, seq_idx, depth_model, pipe, camera_traj=None, loop=T
 
         K = example["K"][None]
         Rt = example["Rt"][None]
-        # Rt_next = Rt.clone()
-        # Rt_next[0, 1, 3] -= 0.2
-        # Rt_next[0, 2, 3] += 0.2
         Rt_next = example_next["Rt"][None]
-
-        Rt[:, 0, 3] *= 512
-        Rt[:, 1, 3] *= 512
-
-        K[:, 0, 0] *= 512 / 256
-        K[:, 1, 1] *= 512 / 256
-        K[:, 0, 2] *= 512 / 256
-        K[:, 1, 2] *= 512 / 256
         # image_next = example_next["image"]
         
         # compute depth
-        disparity = depth_model.forward_PIL(image_src)
-        disparity = cv2.resize(disparity, (512, 512), interpolation=cv2.INTER_LINEAR)
-        disparity = torch.from_numpy(disparity)[None, None]
-        # depth = baseline * focal / disparity
-        depth = 100 / (disparity + 1e-4)
-        # import ipdb; ipdb.set_trace()
+        depth = example["depth"][None, None]
 
         # warp image_src to the target pose by depth
         image_tgt, mask = warp(image_src, depth, Rt, Rt_next, K)
@@ -140,6 +125,7 @@ def generate_video(dataset, seq_idx, depth_model, pipe, camera_traj=None, loop=T
         
         # concat image for saving
         image_save = PIL_utils.concat(image_tgt, inpaint_image)
+        image_save = PIL_utils.concat(mask, image_save)
         image_save = PIL_utils.concat(image_src, image_save)
         image_save_list.append(image_save)
 
@@ -152,17 +138,18 @@ def generate_video(dataset, seq_idx, depth_model, pipe, camera_traj=None, loop=T
 
 if __name__ == "__main__":
     device = "cuda"
-    rootPath = 'vis/0319-depth-warp/'
+    rootPath = 'vis/0329-depth-warp-test/'
     os.makedirs(rootPath, exist_ok=True)
 
-    dataset = RE10KDataset(task='val', size=256)
+    dataset = ScanNetDataset()
 
     pipe = StableDiffusionInpaintPipeline.from_pretrained("stabilityai/stable-diffusion-2-inpainting", torch_dtype=torch.float16)
     pipe = pipe.to(device)
 
     model_weights = "checkpoints/dpt_large-midas-2f21e586.pt"
     model_type = "dpt_large"
-    depth_model = MiDaS(model_weights, model_type, device=device, optimize=False)
+    # depth_model = MiDaS(model_weights, model_type, device=device, optimize=False)
+    depth_model = None
 
     for i in range(len(dataset)):
         outPath = os.path.join(rootPath, f'{i}/')

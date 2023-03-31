@@ -13,6 +13,6 @@ __pycache__
 /vis
 /docker
 /kubernetes
-/data/scannet_minival
+/data
 
 /*.sh
