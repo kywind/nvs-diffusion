@@ -85,6 +85,8 @@ class TrainerConfig(ExperimentConfig):
     """Path to config YAML file."""
     log_gradients: bool = False
     """Optionally log gradients during training"""
+    steps_per_inpaint: int = 10
+    """Number of steps between inpainting."""
 
 
 class Trainer:
@@ -242,6 +244,11 @@ class Trainer:
 
                 if step_check(step, self.config.steps_per_save):
                     self.save_checkpoint(step)
+                
+                if step_check(self, self.config.steps_per_inpaint):
+                    poses = self.pipeline.find_inpaint_cameras(step)
+                    self.pipeline.inpaint(poses)
+                    self.pipeline.datamanager.update_inpaint_cameras(poses)
 
                 writer.write_out_storage()
 

@@ -364,6 +364,12 @@ class NerfactoModel(Model):
 
         images_dict = {"img": combined_rgb, "accumulation": combined_acc, "depth": combined_depth}
 
+        if self.config.predict_normals:
+            normals = outputs["normals"]
+            pred_normals = outputs["pred_normals"]
+            combined_normals = torch.cat([normals, pred_normals], dim=1)
+            images_dict["normals"] = combined_normals
+
         for i in range(self.config.num_proposal_iterations):
             key = f"prop_depth_{i}"
             prop_depth_i = colormaps.apply_depth_colormap(

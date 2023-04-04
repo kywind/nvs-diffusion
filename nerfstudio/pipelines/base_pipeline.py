@@ -48,6 +48,8 @@ from nerfstudio.engine.callbacks import TrainingCallback, TrainingCallbackAttrib
 from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.utils import profiler
 
+from nerfstudio.inpainter.stable_diffusion import StableDiffusionInpainter
+
 
 def module_wrapper(ddp_or_model: Union[DDP, Model]) -> Model:
     """
@@ -242,6 +244,13 @@ class VanillaPipeline(Pipeline):
         )
         self.model.to(device)
 
+        # Inpainter
+        self.inpainter = StableDiffusionInpainter(
+            prompt='Real estate photo',
+            device=device,
+        )
+        self.inpaint_camera_count = 1
+
         self.world_size = world_size
         if world_size > 1:
             self._model = typing.cast(Model, DDP(self._model, device_ids=[local_rank], find_unused_parameters=True))
@@ -279,6 +288,14 @@ class VanillaPipeline(Pipeline):
         loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
 
         return model_outputs, loss_dict, metrics_dict
+
+    def find_inpaint_cameras(self):
+        """Find the cameras that need inpainting"""
+        inpaint_cameras = []
+        cameras = self.datamanager.train_dataset.cameras
+        import ipdb; ipdb.set_trace()
+
+        return inpaint_cameras
 
     def forward(self):
         """Blank forward method

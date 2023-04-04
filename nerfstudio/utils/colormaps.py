@@ -17,7 +17,9 @@
 from typing import Optional
 
 import torch
+import numpy as np
 from matplotlib import cm
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from torchtyping import TensorType
 
 from nerfstudio.utils import colors
@@ -33,9 +35,14 @@ def apply_colormap(image: TensorType["bs":..., 1], cmap="viridis") -> TensorType
     Returns:
         TensorType: Colored image with colors in [0, 1]
     """
-
+    # cmap = "gray"
     colormap = cm.get_cmap(cmap)
-    colormap = torch.tensor(colormap.colors).to(image.device)  # type: ignore
+    if isinstance(colormap, LinearSegmentedColormap):
+        colormap = torch.tensor(colormap(np.arange(0,colormap.N))[:,:3]).to(image.device)
+    else:
+        assert isinstance(colormap, ListedColormap)
+        colormap = torch.tensor(colormap.colors).to(image.device)  # type: ignore
+
     image = torch.nan_to_num(image, 0)
     image_long = (image * 255).long()
     image_long_min = torch.min(image_long)
@@ -64,7 +71,6 @@ def apply_depth_colormap(
     Returns:
         Colored depth image with colors in [0, 1]
     """
-
     near_plane = near_plane or float(torch.min(depth))
     far_plane = far_plane or float(torch.max(depth))
 
