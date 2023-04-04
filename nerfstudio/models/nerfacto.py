@@ -379,3 +379,8 @@ class NerfactoModel(Model):
             images_dict[key] = prop_depth_i
 
         return metrics_dict, images_dict
+
+    def get_novel_view_rendering(self, outputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+        rgb = outputs["rgb"]
+        acc = outputs["accumulation"]
+        return rgb, acc

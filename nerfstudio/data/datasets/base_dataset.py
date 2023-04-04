@@ -97,6 +97,7 @@ class InputDataset(Dataset):
         data = {"image_idx": image_idx}
         data["image"] = image
         if self.has_masks:
+            raise Exception
             mask_filepath = self._dataparser_outputs.mask_filenames[image_idx]
             data["mask"] = get_image_mask_tensor_from_path(filepath=mask_filepath, scale_factor=self.scale_factor)
             assert (
@@ -128,3 +129,6 @@ class InputDataset(Dataset):
         """
 
         return self._dataparser_outputs.image_filenames
+    
+    def add_image(self, image_path: List[Path]):
+        self._dataparser_outputs.image_filenames.extend(image_path)

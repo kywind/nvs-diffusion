@@ -63,10 +63,10 @@ class StableDiffusionInpainter(Inpainter):
         self.model.to(self.device)
 
 
-    def foward(
+    def forward(
         self,
-        images: TensorType["bs":..., "rgb":3],
-        masks: TensorType["bs":..., 1],
+        image: TensorType["hw":..., "rgb":3],
+        mask: TensorType["hw":..., 1],
         **kwargs
     ) -> Dict[str, Any]:
         """Forward pass for inpainting.
@@ -78,27 +78,23 @@ class StableDiffusionInpainter(Inpainter):
         Returns:
             outputs: outputs from the inpainting model.
         """
-        pred_images = []
 
-        for i in range(images.shape[0]):
+        image = (image + 1.) * 127.5
+        image = image.detach().cpu().numpy().astype(np.uint8)
+        image = Image.fromarray(image).resize((512, 512))
 
-            image = (images[i] + 1.) * 127.5
-            image = image.numpy().astype(np.uint8)
-            image = Image.fromarray(image).resize((512, 512))
+        # import ipdb; ipdb.set_trace()
+        mask = mask.detach().cpu().numpy()[..., 0]
+        mask = np.floor(mask) * 255
+        mask = mask.astype(np.uint8)
+        mask = Image.fromarray(mask).resize((512, 512))
 
-            mask = masks[i].numpy().astype(np.uint8)
-            mask = Image.fromarray(mask).resize((512, 512))
+        if "prompt" in kwargs:
+            prompt = kwargs["prompt"]
+        else:
+            prompt = "Real estate photo"
 
-            if "prompt" in kwargs:
-                prompt = kwargs["prompt"][i]
-            else:
-                prompt = "Real estate photo"
+        inpaint_image = self.model(prompt=prompt, image=image, mask_image=mask).images[0]
+        inpaint_image = torch.from_numpy(np.array(inpaint_image)).to(self.device).permute(2, 0, 1).float() / 127.5 - 1.
 
-            inpaint_image = self.model(prompt=prompt, image=image, mask_image=mask).images[0]
-
-            inpaint_image = torch.from_numpy(np.array(inpaint_image)).to(self.device).permute(2, 0, 1).float() / 127.5 - 1.
-            pred_images.append(inpaint_image)
-
-        pred_images = torch.stack(pred_images)
-        import ipdb; ipdb.set_trace()
-        return {"pred_images": pred_images}
+        return inpaint_image
