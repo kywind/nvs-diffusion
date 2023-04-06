@@ -321,6 +321,8 @@ class ViewerState:
         self.webrtc_thread = None
         self.kill_webrtc_signal = False
 
+        self.shown_image_idxs = []
+
     def _pick_drawn_image_idxs(self, total_num: int) -> list[int]:
         """Determine indicies of images to display in viewer.
 
@@ -362,6 +364,7 @@ class ViewerState:
 
         # draw the training cameras and images
         image_indices = self._pick_drawn_image_idxs(len(dataset))
+        self.shown_image_idxs = image_indices
         for idx in image_indices:
             image = dataset[idx]["image"]
             bgr = image[..., [2, 1, 0]]
@@ -552,6 +555,34 @@ class ViewerState:
                 self._check_webrtc_offer()
                 run_loop = not is_training
                 local_step += 1
+
+    @profiler.time_function
+    def update_camera(self, trainer, step: int, dataset: InputDataset):
+
+        is_training = self.vis["renderingState/isTraining"].read()
+
+        self._check_camera_path_payload(trainer, step)
+        self._check_populate_paths_payload(trainer, step)
+        self._check_webrtc_offer()
+
+        self._add_camera(step, dataset)
+
+
+    def _add_camera(self, step: int, dataset: InputDataset):
+        # draw the training cameras and images
+        image_indices = self._pick_drawn_image_idxs(len(dataset))
+        removed_image_idxs = self.shown_image_idxs.copy()
+        for idx in image_indices:
+            if idx in self.shown_image_idxs:
+                removed_image_idxs.remove(idx)
+                continue
+            image = dataset[idx]["image"]
+            bgr = image[..., [2, 1, 0]]
+            camera_json = dataset.cameras.to_json(camera_idx=idx, image=bgr, max_size=100)
+            self.vis[f"sceneState/cameras/{idx:06d}"].write(camera_json)
+        for idx in removed_image_idxs:
+            self.vis[f"sceneState/cameras/{idx:06d}"].delete()
+        self.shown_image_idxs = image_indices
 
     def check_interrupt(self, frame, event, arg):  # pylint: disable=unused-argument
         """Raises interrupt when flag has been set and not already on lowest resolution.

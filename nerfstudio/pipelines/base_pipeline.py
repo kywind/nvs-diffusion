@@ -252,7 +252,6 @@ class VanillaPipeline(Pipeline):
             prompt='Real estate photo',
             device=device,
         )
-        self.inpaint_camera_count = 1
 
         self.world_size = world_size
         if world_size > 1:
@@ -295,7 +294,7 @@ class VanillaPipeline(Pipeline):
 
         return model_outputs, loss_dict, metrics_dict
 
-    def find_inpaint_cameras(self, step: int):
+    def find_inpaint_cameras(self, step: int, num_iters: int):
         """Find the cameras that need inpainting"""
         cameras = self.datamanager.train_dataset.cameras
         fx = cameras.fx[-1]
@@ -307,18 +306,18 @@ class VanillaPipeline(Pipeline):
         distort = cameras.distortion_params[-1]
         
         new_cams = []
-        num_iters = 2
+        prev_cam = cameras.camera_to_worlds[-1]
+        pprev_cam = cameras.camera_to_worlds[-2]
         for i in range(num_iters):
-            prev_cam = cameras.camera_to_worlds[-1]
-            pprev_cam = cameras.camera_to_worlds[-2]
             rel_t = prev_cam[:3, 3] - pprev_cam[:3, 3]
-            rel_R = prev_cam[:3, :3] @ pprev_cam[:3, :3].transpose(0, 1)
-            new_t = num_iters * rel_t + prev_cam[:3, 3]
+            # rel_R = prev_cam[:3, :3] @ pprev_cam[:3, :3].transpose(0, 1)
+            new_t = rel_t + prev_cam[:3, 3]
             new_R = prev_cam[:3, :3].clone()
-            for _ in range(i):
-                new_R = rel_R @ new_R
+            # new_R = rel_R @ new_R
             new_cam = torch.cat([new_R, new_t.unsqueeze(-1)], dim=-1)
-            new_cams.append(new_cam)
+            new_cams.append(new_cam.clone())
+            pprev_cam = prev_cam.clone()
+            prev_cam = new_cam.clone()
 
         inpaint_cameras = Cameras(
             camera_to_worlds=torch.stack(new_cams, dim=0),
@@ -333,10 +332,10 @@ class VanillaPipeline(Pipeline):
         ).to(self.device)
         return inpaint_cameras
     
-    def inpaint(self, step: int):
+    def inpaint(self, step: int, num_inpaint_cameras: int):
         """Inpaint the cameras that need inpainting"""
         self.eval()
-        inpaint_cameras = self.find_inpaint_cameras(step)
+        inpaint_cameras = self.find_inpaint_cameras(step, num_inpaint_cameras)
         inpaint_images = []
         for camera_index in range(inpaint_cameras.camera_to_worlds.shape[0]):
             camera_ray_bundle = inpaint_cameras.generate_rays(camera_indices=camera_index)

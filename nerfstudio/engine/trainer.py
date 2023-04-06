@@ -87,6 +87,8 @@ class TrainerConfig(ExperimentConfig):
     """Optionally log gradients during training"""
     steps_per_inpaint: int = 20
     """Number of steps between inpainting."""
+    num_inpaint_cameras: int = 3
+    """Number of cameras to inpaint per inpainting step."""
 
 
 class Trainer:
@@ -232,6 +234,11 @@ class Trainer:
                         avg_over_steps=True,
                     )
 
+                if step_check(step, self.config.steps_per_inpaint):
+                    self.pipeline.inpaint(step, self.config.num_inpaint_cameras)
+                    # num_rays_per_batch = self.pipeline.datamanager.get_train_rays_per_batch()
+                    self.viewer_state.update_camera(self, step, self.pipeline.datamanager.train_dataset)
+
                 self._update_viewer_state(step)
 
                 # a batch of train rays
@@ -244,9 +251,6 @@ class Trainer:
 
                 if step_check(step, self.config.steps_per_save):
                     self.save_checkpoint(step)
-                
-                if step_check(step, self.config.steps_per_inpaint):
-                    self.pipeline.inpaint(step)
 
                 writer.write_out_storage()
 
