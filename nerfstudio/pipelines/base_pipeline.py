@@ -343,7 +343,7 @@ class VanillaPipeline(Pipeline):
             outputs = self.model.get_outputs_for_camera_ray_bundle(camera_ray_bundle)
             image, mask = self.model.get_novel_view_rendering(outputs)
         
-            inpaint_images.append(self.inpainter(image, mask))
+            inpaint_images.append(self.inpainter(image, mask, step=step))
         self.datamanager.update_inpaint_cameras(step, inpaint_images, inpaint_cameras, self.save_dir)
         self.train()
 

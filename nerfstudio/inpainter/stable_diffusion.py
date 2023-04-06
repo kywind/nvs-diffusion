@@ -67,6 +67,7 @@ class StableDiffusionInpainter(Inpainter):
         self,
         image: TensorType["hw":..., "rgb":3],
         mask: TensorType["hw":..., 1],
+        step: int,
         **kwargs
     ) -> Dict[str, Any]:
         """Forward pass for inpainting.
@@ -88,6 +89,7 @@ class StableDiffusionInpainter(Inpainter):
         mask = np.floor(mask) * 255
         mask = mask.astype(np.uint8)
         mask = Image.fromarray(mask).resize((512, 512))
+        mask.save(f"temp/vis-temp/mask_{step}.png")
 
         if "prompt" in kwargs:
             prompt = kwargs["prompt"]
