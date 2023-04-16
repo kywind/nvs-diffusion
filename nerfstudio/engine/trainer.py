@@ -85,9 +85,9 @@ class TrainerConfig(ExperimentConfig):
     """Path to config YAML file."""
     log_gradients: bool = False
     """Optionally log gradients during training"""
-    steps_per_inpaint: int = 2000
+    steps_per_inpaint: int = 1000
     """Number of steps between inpainting."""
-    num_inpaint_cameras: int = 3
+    num_inpaint_cameras: int = 5
     """Number of cameras to inpaint per inpainting step."""
 
 
