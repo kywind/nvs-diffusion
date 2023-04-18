@@ -30,6 +30,7 @@ from torchtyping import TensorType
 
 from nerfstudio.data.dataparsers.base_dataparser import DataparserOutputs
 from nerfstudio.data.utils.data_utils import get_image_mask_tensor_from_path
+from nerfstudio.cameras.cameras import Cameras, CameraType
 
 
 class InputDataset(Dataset):
@@ -130,5 +131,56 @@ class InputDataset(Dataset):
 
         return self._dataparser_outputs.image_filenames
     
-    def add_image(self, image_path: List[Path]):
-        self._dataparser_outputs.image_filenames.extend(image_path)
+    def prepare_inpaint_cameras_and_images(self, step: int, num_inpaint_images: int):
+        fx = self.cameras.fx[-1]
+        fy = self.cameras.fy[-1]
+        cx = self.cameras.cx[-1]
+        cy = self.cameras.cy[-1]
+        w = self.cameras.width[-1]
+        h = self.cameras.height[-1]
+        distort = self.cameras.distortion_params[-1]
+        
+        new_cams = []
+        new_images = []
+        num_cams = self.cameras.camera_to_worlds.shape[0]
+        cam_samples = np.floor(np.linspace(0, num_cams-1, num_inpaint_images)).astype(np.int64)
+        # cam_samples = list(range(num_inpaint_images))
+        for i in range(num_cams):
+            t = self.cameras.camera_to_worlds[i, :3, 3]
+            R = self.cameras.camera_to_worlds[i, :3, :3]
+            
+            orig_cam = torch.cat([R, t.unsqueeze(-1)], dim=-1)
+            new_cams.append(orig_cam.clone())
+            new_images.append(self._dataparser_outputs.image_filenames[i])
+
+        for i in cam_samples:
+            t = self.cameras.camera_to_worlds[i, :3, 3]
+            R = self.cameras.camera_to_worlds[i, :3, :3]
+            new_t = t.clone()
+            new_R = R.clone()
+ 
+            new_cam = torch.cat([new_R, new_t.unsqueeze(-1)], dim=-1)
+            new_cams.append(new_cam.clone())
+            new_images.append(None)
+
+        assert self.cameras.times is None  # not supported
+        self.cameras = Cameras(
+            camera_to_worlds=torch.stack(new_cams, dim=0),
+            fx=fx,
+            fy=fy,
+            cx=cx,
+            cy=cy,
+            width=w,
+            height=h,
+            camera_type=CameraType.PERSPECTIVE,
+            distortion_params=distort[None].repeat(len(new_cams), 1),
+        )  # update cameras
+        self._dataparser_outputs.image_filenames = new_images  # update images
+
+    def update_image(self, index: int, image_dir: str) -> None:
+        self._dataparser_outputs.image_filenames[index] = Path(image_dir)
+
+    def inpaint_indices(self):
+        for i in range(0, len(self._dataparser_outputs.image_filenames)):
+            if self._dataparser_outputs.image_filenames[i] is None:
+                yield i

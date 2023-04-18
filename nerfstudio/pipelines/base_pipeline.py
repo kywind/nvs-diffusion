@@ -49,8 +49,12 @@ from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.utils import profiler
 
 from nerfstudio.inpainter.stable_diffusion import StableDiffusionInpainter
+from nerfstudio.inpainter.image_to_image import ImageToImageInpainter
 from nerfstudio.cameras.cameras import Cameras, CameraType
 
+import os
+import numpy as np
+from PIL import Image
 from datetime import datetime
 
 
@@ -248,7 +252,11 @@ class VanillaPipeline(Pipeline):
         self.model.to(device)
 
         # Inpainter
-        self.inpainter = StableDiffusionInpainter(
+        # self.inpainter = StableDiffusionInpainter(
+        #     prompt='Real estate photo',
+        #     device=device,
+        # )
+        self.inpainter = ImageToImageInpainter(
             prompt='Real estate photo',
             device=device,
         )
@@ -259,7 +267,8 @@ class VanillaPipeline(Pipeline):
             dist.barrier(device_ids=[local_rank])
         
         self.timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        self.save_dir = f'temp/inpaint-{self.timestamp}'
+        self.inpaint_save_dir = f'temp/inpaint-{self.timestamp}'
+        os.makedirs(self.inpaint_save_dir, exist_ok=True)
 
     @property
     def device(self):
@@ -294,57 +303,32 @@ class VanillaPipeline(Pipeline):
 
         return model_outputs, loss_dict, metrics_dict
 
-    def find_inpaint_cameras(self, step: int, num_iters: int):
-        """Find the cameras that need inpainting"""
-        cameras = self.datamanager.train_dataset.cameras
-        fx = cameras.fx[-1]
-        fy = cameras.fy[-1]
-        cx = cameras.cx[-1]
-        cy = cameras.cy[-1]
-        w = cameras.width[-1]
-        h = cameras.height[-1]
-        distort = cameras.distortion_params[-1]
-        
-        new_cams = []
-        prev_cam = cameras.camera_to_worlds[-1]
-        pprev_cam = cameras.camera_to_worlds[-2]
-        for i in range(num_iters):
-            rel_t = prev_cam[:3, 3] - pprev_cam[:3, 3]
-            # rel_R = prev_cam[:3, :3] @ pprev_cam[:3, :3].transpose(0, 1)
-            new_t = rel_t + prev_cam[:3, 3]
-            new_R = prev_cam[:3, :3].clone()
-            # new_R = rel_R @ new_R
-            new_cam = torch.cat([new_R, new_t.unsqueeze(-1)], dim=-1)
-            new_cams.append(new_cam.clone())
-            pprev_cam = prev_cam.clone()
-            prev_cam = new_cam.clone()
-
-        inpaint_cameras = Cameras(
-            camera_to_worlds=torch.stack(new_cams, dim=0),
-            fx=fx,
-            fy=fy,
-            cx=cx,
-            cy=cy,
-            width=w,
-            height=h,
-            camera_type=CameraType.PERSPECTIVE,
-            distortion_params=distort[None].repeat(num_iters, 1),
-        ).to(self.device)
-        return inpaint_cameras
-    
     def inpaint(self, step: int, num_inpaint_cameras: int):
         """Inpaint the cameras that need inpainting"""
         self.eval()
-        inpaint_cameras = self.find_inpaint_cameras(step, num_inpaint_cameras)
-        inpaint_images = []
-        for camera_index in range(inpaint_cameras.camera_to_worlds.shape[0]):
-            camera_ray_bundle = inpaint_cameras.generate_rays(camera_indices=camera_index)
+        self.datamanager.train_dataset.prepare_inpaint_cameras_and_images(step, num_inpaint_cameras)
+        
+        cameras = self.datamanager.train_dataset.cameras.to(self.device)
+        for index in self.datamanager.train_dataset.inpaint_indices():
+            camera_ray_bundle = cameras.generate_rays(camera_indices=index)
 
             outputs = self.model.get_outputs_for_camera_ray_bundle(camera_ray_bundle)
             image, mask = self.model.get_novel_view_rendering(outputs)
-        
-            inpaint_images.append(self.inpainter(image, mask, step=step))
-        self.datamanager.update_inpaint_cameras(step, inpaint_images, inpaint_cameras, self.save_dir)
+            inpaint_image = self.inpainter(image, mask, step=step)
+
+            inpaint_image.save(save_path)
+            # inpaint_image = inpaint_image.permute(1, 2, 0).cpu().numpy()
+            # inpaint_image = (inpaint_image * 255).astype(np.uint8)
+            # save_path = os.path.join(self.inpaint_save_dir, f'frame_{step:04d}_{index:04d}_inpaint.png')
+            # Image.fromarray(inpaint_image).save(save_path)
+
+            render_image = image.cpu().numpy()
+            render_image = (render_image * 255).astype(np.uint8)
+            save_path = os.path.join(self.inpaint_save_dir, f'frame_{step:04d}_{index:04d}.png')
+            Image.fromarray(render_image).save(save_path)
+
+            self.datamanager.train_dataset.update_image(index, save_path)
+
         self.train()
 
     def forward(self):

@@ -13,7 +13,7 @@ from nerfstudio.configs.base_config import InstantiateConfig
 import torch
 from torchtyping import TensorType
 from nerfstudio.inpainter.base_inpainter import Inpainter
-from diffusers import StableDiffusionInpaintPipeline
+from diffusers import StableDiffusionImg2ImgPipeline
 
 import kornia
 from kornia.geometry.depth import depth_to_3d, project_points, DepthWarper
@@ -41,7 +41,7 @@ def blend(img, img_ori, mask):
     return img
 
 
-class StableDiffusionInpainter(Inpainter):
+class ImageToImageInpainter(Inpainter):
     """Model class for inpainting.
 
     Args:
@@ -58,8 +58,8 @@ class StableDiffusionInpainter(Inpainter):
         self.camera_selector = None
         self.device = device
 
-        self.model = StableDiffusionInpaintPipeline.from_pretrained(
-            "stabilityai/stable-diffusion-2-inpainting", torch_dtype=torch.float16)
+        self.model = StableDiffusionImg2ImgPipeline.from_pretrained(
+            "stabilityai/stable-diffusion-2", torch_dtype=torch.float16)
         self.model.to(self.device)
 
 
@@ -85,18 +85,22 @@ class StableDiffusionInpainter(Inpainter):
         image = Image.fromarray(image).resize((512, 512))
 
         # import ipdb; ipdb.set_trace()
-        mask = mask.detach().cpu().numpy()[..., 0]
-        mask = np.floor(mask) * 255
-        mask = mask.astype(np.uint8)
-        mask = Image.fromarray(mask).resize((512, 512))
+        # mask = mask.detach().cpu().numpy()[..., 0]
+        # mask = np.floor(mask) * 255
+        # mask = mask.astype(np.uint8)
+        # mask = Image.fromarray(mask).resize((512, 512))
         # mask.save(f"temp/vis-temp/mask_{step}.png")
 
         if "prompt" in kwargs:
             prompt = kwargs["prompt"]
         else:
             prompt = "Real estate photo"
-
-        inpaint_image = self.model(prompt=prompt, image=image, mask_image=mask).images[0]
+        inpaint_image = self.model(
+            prompt=prompt, 
+            image=image, 
+            strength=0.5,
+            guidance_scale=7.5,  # default value
+        ).images[0]
         # inpaint_image = torch.from_numpy(np.array(inpaint_image)).to(self.device).permute(2, 0, 1).float() / 127.5 - 1.
 
         return inpaint_image

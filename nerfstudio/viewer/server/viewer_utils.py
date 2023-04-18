@@ -565,8 +565,17 @@ class ViewerState:
         self._check_populate_paths_payload(trainer, step)
         self._check_webrtc_offer()
 
-        self._add_camera(step, dataset)
+        self._add_camera_simple(step, dataset)
 
+    def _add_camera_simple(self, step: int, dataset: InputDataset):
+        # re-draw the training cameras and images completely
+        image_indices = self._pick_drawn_image_idxs(len(dataset))
+        for idx in image_indices:
+            image = dataset[idx]["image"]
+            bgr = image[..., [2, 1, 0]]
+            camera_json = dataset.cameras.to_json(camera_idx=idx, image=bgr, max_size=100)
+            self.vis[f"sceneState/cameras/{idx:06d}"].write(camera_json)
+        self.shown_image_idxs = image_indices
 
     def _add_camera(self, step: int, dataset: InputDataset):
         # draw the training cameras and images

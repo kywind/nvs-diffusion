@@ -74,10 +74,6 @@ from nerfstudio.utils.misc import IterableWrapper
 from nerfstudio.cameras.cameras import CameraType
 from nerfstudio.cameras.rays import RayBundle
 
-import os
-import numpy as np
-from PIL import Image
-
 CONSOLE = Console(width=120)
 
 AnnotatedDataParserUnion = tyro.conf.OmitSubcommandPrefixes[  # Omit prefixes of flags in subcommands.
@@ -516,29 +512,3 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
             assert len(camera_opt_params) == 0
 
         return param_groups
-
-    def update_inpaint_cameras(self, step: int, images: List, inpaint_cameras: List, image_save_dir: str) -> None:
-        """Update the cameras used for inpainting."""
-        inpaint_cameras = inpaint_cameras.to(self.train_dataset.cameras.device)
-        self.train_dataset.cameras.camera_to_worlds = torch.cat([self.train_dataset.cameras.camera_to_worlds, inpaint_cameras.camera_to_worlds], dim=0)
-        self.train_dataset.cameras.fx = torch.cat([self.train_dataset.cameras.fx, inpaint_cameras.fx], dim=0)
-        self.train_dataset.cameras.fy = torch.cat([self.train_dataset.cameras.fy, inpaint_cameras.fy], dim=0)
-        self.train_dataset.cameras.cx = torch.cat([self.train_dataset.cameras.cx, inpaint_cameras.cx], dim=0)
-        self.train_dataset.cameras.cy = torch.cat([self.train_dataset.cameras.cy, inpaint_cameras.cy], dim=0)
-        self.train_dataset.cameras.width = torch.cat([self.train_dataset.cameras.width, inpaint_cameras.width], dim=0)
-        self.train_dataset.cameras.height = torch.cat([self.train_dataset.cameras.height, inpaint_cameras.height], dim=0)
-        self.train_dataset.cameras.distortion_params = torch.cat([self.train_dataset.cameras.distortion_params, inpaint_cameras.distortion_params], dim=0)
-        self.train_dataset.cameras.camera_type = torch.cat([self.train_dataset.cameras.camera_type, inpaint_cameras.camera_type], dim=0)
-        if self.train_dataset.cameras.times is not None:
-            self.train_dataset.cameras.times = torch.cat([self.train_dataset.cameras.times, inpaint_cameras.times], dim=0)
-
-        os.makedirs(image_save_dir, exist_ok=True)
-        image_paths = []
-        for i, image in enumerate(images):
-            image = image.permute(1, 2, 0).cpu().numpy()
-            image = (image * 255).astype(np.uint8)
-            save_path = os.path.join(image_save_dir, f'frame_{step:04d}_{i:04d}.png')
-            Image.fromarray(image).save(save_path)
-            image_paths.append(save_path)
-
-        self.train_dataset.add_image(image_paths)
