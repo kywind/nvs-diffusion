@@ -157,6 +157,7 @@ class InputDataset(Dataset):
             t = self.cameras.camera_to_worlds[i, :3, 3]
             R = self.cameras.camera_to_worlds[i, :3, :3]
             new_t = t.clone()
+            new_t[2] += 0.1
             new_R = R.clone()
  
             new_cam = torch.cat([new_R, new_t.unsqueeze(-1)], dim=-1)
