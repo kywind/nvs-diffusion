@@ -23,6 +23,7 @@ from typing import Optional, Type
 import numpy as np
 import torch
 from PIL import Image
+from copy import deepcopy
 from rich.console import Console
 from typing_extensions import Literal
 
@@ -62,6 +63,8 @@ class NerfstudioDataParserConfig(DataParserConfig):
     """Whether to automatically scale the poses to fit in +/- 1 bounding box."""
     train_split_fraction: float = 0.9
     """The fraction of images to use for training. The remaining images are for eval."""
+    num_init_images: int = 20
+    """The number of images to use for initialization."""
     depth_unit_scale_factor: float = 1e-3
     """Scales the depth values to meters. Default value is 0.001 for a millimeter to meter conversion."""
 
@@ -87,6 +90,8 @@ class Nerfstudio(DataParser):
         mask_filenames = []
         depth_filenames = []
         poses = []
+        pending_image_filenames = []
+        pending_poses = []
         num_skipped_image_filenames = 0
 
         fx_fixed = "fl_x" in meta
@@ -193,9 +198,13 @@ class Nerfstudio(DataParser):
         i_eval = np.setdiff1d(i_all, i_train)  # eval images are the remaining images
         assert len(i_eval) == num_eval_images
         if split == "train":
-            indices = i_train
+            indices = np.linspace(
+                0, len(i_train) - 1, self.config.num_init_images, dtype=int
+            )
+            indices_pending = np.setdiff1d(i_train, indices)
         elif split in ["val", "test"]:
             indices = i_eval
+            indices_pending = []
         else:
             raise ValueError(f"Unknown dataparser split {split}")
 
@@ -221,6 +230,9 @@ class Nerfstudio(DataParser):
         poses[:, :3, 3] *= scale_factor
 
         # Choose image_filenames and poses based on split, but after auto orient and scaling the poses.
+        pending_image_filenames = deepcopy([image_filenames[i] for i in indices_pending])
+        pending_poses = deepcopy(poses[indices_pending])
+
         image_filenames = [image_filenames[i] for i in indices]
         mask_filenames = [mask_filenames[i] for i in indices] if len(mask_filenames) > 0 else []
         depth_filenames = [depth_filenames[i] for i in indices] if len(depth_filenames) > 0 else []
@@ -271,12 +283,28 @@ class Nerfstudio(DataParser):
             camera_type=camera_type,
         )
 
+        pending_cameras = Cameras(
+            fx=fx,
+            fy=fy,
+            cx=cx,
+            cy=cy,
+            distortion_params=distortion_params,
+            height=height,
+            width=width,
+            camera_to_worlds=pending_poses[:, :3, :4],
+            camera_type=camera_type,
+        )
+
         assert self.downscale_factor is not None
         cameras.rescale_output_resolution(scaling_factor=1.0 / self.downscale_factor)
+        pending_cameras.rescale_output_resolution(scaling_factor=1.0 / self.downscale_factor)
 
+        assert len(mask_filenames) == 0 and len(depth_filenames) == 0, "Not implemented yet"
         dataparser_outputs = DataparserOutputs(
             image_filenames=image_filenames,
+            pending_image_filenames=pending_image_filenames,
             cameras=cameras,
+            pending_cameras=pending_cameras,
             scene_box=scene_box,
             mask_filenames=mask_filenames if len(mask_filenames) > 0 else None,
             dataparser_scale=scale_factor,

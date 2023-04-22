@@ -52,8 +52,12 @@ class DataparserOutputs:
 
     image_filenames: List[Path]
     """Filenames for the images."""
+    pending_image_filenames: List[Path]
+    """Filenames for the images that are pending to be loaded."""
     cameras: Cameras
     """Camera object storing collection of camera information in dataset."""
+    pending_cameras: Cameras
+    """Camera object storing collection of camera information in dataset that are pending to be loaded."""
     alpha_color: Optional[TensorType[3]] = None
     """Color of dataset background."""
     scene_box: SceneBox = SceneBox()

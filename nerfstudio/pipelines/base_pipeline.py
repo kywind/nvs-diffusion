@@ -316,10 +316,10 @@ class VanillaPipeline(Pipeline):
             image, mask = self.model.get_novel_view_rendering(outputs)
             inpaint_image = self.inpainter(image, mask, step=step)
 
+            save_path = os.path.join(self.inpaint_save_dir, f'frame_{step:04d}_{index:04d}_inpaint.png')
             inpaint_image.save(save_path)
             # inpaint_image = inpaint_image.permute(1, 2, 0).cpu().numpy()
             # inpaint_image = (inpaint_image * 255).astype(np.uint8)
-            # save_path = os.path.join(self.inpaint_save_dir, f'frame_{step:04d}_{index:04d}_inpaint.png')
             # Image.fromarray(inpaint_image).save(save_path)
 
             render_image = image.cpu().numpy()

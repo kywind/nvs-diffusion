@@ -87,7 +87,7 @@ class TrainerConfig(ExperimentConfig):
     """Optionally log gradients during training"""
     steps_per_inpaint: int = 1000
     """Number of steps between inpainting."""
-    num_inpaint_cameras: int = 5
+    num_inpaint_cameras: int = 10
     """Number of cameras to inpaint per inpainting step."""
 
 
