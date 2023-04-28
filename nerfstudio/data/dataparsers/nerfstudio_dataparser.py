@@ -199,7 +199,7 @@ class Nerfstudio(DataParser):
         assert len(i_eval) == num_eval_images
         if split == "train":
             indices = np.linspace(
-                0, len(i_train) - 1, self.config.num_init_images, dtype=int
+                0, len(i_train) - 1, min(self.config.num_init_images, len(i_train)), dtype=int
             )
             indices_pending = np.setdiff1d(i_train, indices)
         elif split in ["val", "test"]:

@@ -96,7 +96,7 @@ class Field(nn.Module):
             density_embedding: Density embeddings to condition on.
         """
 
-    def forward(self, ray_samples: RaySamples, compute_normals: bool = False) -> Dict[FieldHeadNames, TensorType]:
+    def forward(self, ray_samples: RaySamples, step: int = 0, compute_normals: bool = False) -> Dict[FieldHeadNames, TensorType]:
         """Evaluates the field at points along the ray.
 
         Args:
@@ -104,11 +104,11 @@ class Field(nn.Module):
         """
         if compute_normals:
             with torch.enable_grad():
-                density, density_embedding = self.get_density(ray_samples)
+                density, density_embedding = self.get_density(ray_samples, step)
         else:
-            density, density_embedding = self.get_density(ray_samples)
+            density, density_embedding = self.get_density(ray_samples, step)
 
-        field_outputs = self.get_outputs(ray_samples, density_embedding=density_embedding)
+        field_outputs = self.get_outputs(ray_samples, step, density_embedding=density_embedding)
         field_outputs[FieldHeadNames.DENSITY] = density  # type: ignore
 
         if compute_normals:

@@ -37,8 +37,9 @@ from nerfstudio.engine.callbacks import (
 )
 from nerfstudio.field_components.field_heads import FieldHeadNames
 from nerfstudio.field_components.spatial_distortions import SceneContraction
+from nerfstudio.field_components.encodings import HashEncoding
 from nerfstudio.fields.density_fields import HashMLPDensityField
-from nerfstudio.fields.nerfacto_field import TCNNNerfactoField
+from nerfstudio.fields.nerfacto_field import TCNNNerfactoField, TorchNerfactoField
 from nerfstudio.model_components.losses import (
     MSELoss,
     distortion_loss,
@@ -128,6 +129,10 @@ class NerfactoModelConfig(ModelConfig):
     """Whether to predict normals or not."""
     disable_scene_contraction: bool = False
     """Whether to disable scene contraction or not."""
+    use_tcnn: bool = False
+    """Whether to use TCNN or not."""
+    use_freenerf: bool = False
+    """Whether to use FreeNeRF or not."""
 
 
 class NerfactoModel(Model):
@@ -149,19 +154,34 @@ class NerfactoModel(Model):
             scene_contraction = SceneContraction(order=float("inf"))
 
         # Fields
-        self.field = TCNNNerfactoField(
-            self.scene_box.aabb,
-            hidden_dim=self.config.hidden_dim,
-            num_levels=self.config.num_levels,
-            max_res=self.config.max_res,
-            log2_hashmap_size=self.config.log2_hashmap_size,
-            hidden_dim_color=self.config.hidden_dim_color,
-            hidden_dim_transient=self.config.hidden_dim_transient,
-            spatial_distortion=scene_contraction,
-            num_images=self.num_train_data,
-            use_pred_normals=self.config.predict_normals,
-            use_average_appearance_embedding=self.config.use_average_appearance_embedding,
-        )
+        if self.config.use_tcnn:
+            self.field = TCNNNerfactoField(
+                self.scene_box.aabb,
+                hidden_dim=self.config.hidden_dim,
+                num_levels=self.config.num_levels,
+                max_res=self.config.max_res,
+                log2_hashmap_size=self.config.log2_hashmap_size,
+                hidden_dim_color=self.config.hidden_dim_color,
+                hidden_dim_transient=self.config.hidden_dim_transient,
+                spatial_distortion=scene_contraction,
+                num_images=self.num_train_data,
+                use_freenerf=self.config.use_freenerf,
+                use_pred_normals=self.config.predict_normals,
+                use_average_appearance_embedding=self.config.use_average_appearance_embedding,
+            )
+        else:
+            encoding = HashEncoding(
+                num_levels=self.config.num_levels,
+                max_res=self.config.max_res,
+                log2_hashmap_size=self.config.log2_hashmap_size,
+                use_freenerf=self.config.use_freenerf,
+            )
+            self.field = TorchNerfactoField(
+                self.scene_box.aabb,
+                num_images=self.num_train_data,
+                position_encoding=encoding,
+                spatial_distortion=scene_contraction,
+            )
 
         self.density_fns = []
         num_prop_nets = self.config.num_proposal_iterations
@@ -262,9 +282,9 @@ class NerfactoModel(Model):
             )
         return callbacks
 
-    def get_outputs(self, ray_bundle: RayBundle):
+    def get_outputs(self, ray_bundle: RayBundle, step: int):
         ray_samples, weights_list, ray_samples_list = self.proposal_sampler(ray_bundle, density_fns=self.density_fns)
-        field_outputs = self.field(ray_samples, compute_normals=self.config.predict_normals)
+        field_outputs = self.field(ray_samples, step, compute_normals=self.config.predict_normals)
         weights = ray_samples.get_weights(field_outputs[FieldHeadNames.DENSITY])
         weights_list.append(weights)
         ray_samples_list.append(ray_samples)

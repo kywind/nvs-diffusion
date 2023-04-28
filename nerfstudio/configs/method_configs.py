@@ -81,6 +81,8 @@ method_configs["nerfacto"] = TrainerConfig(
     steps_per_eval_batch=500,
     steps_per_save=2000,
     max_num_iterations=30000,
+    # steps_per_save=30000,  # for loading pretrained model
+    # max_num_iterations=60000,
     mixed_precision=True,
     pipeline=VanillaPipelineConfig(
         datamanager=VanillaDataManagerConfig(
@@ -278,7 +280,8 @@ method_configs["vanilla-nerf"] = TrainerConfig(
     method_name="vanilla-nerf",
     pipeline=VanillaPipelineConfig(
         datamanager=VanillaDataManagerConfig(
-            dataparser=BlenderDataParserConfig(),
+            # dataparser=BlenderDataParserConfig(),
+            dataparser=NerfstudioDataParserConfig(),
         ),
         model=VanillaModelConfig(_target=NeRFModel),
     ),
@@ -292,6 +295,8 @@ method_configs["vanilla-nerf"] = TrainerConfig(
             "scheduler": None,
         },
     },
+    viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
+    vis="viewer",
 )
 
 method_configs["tensorf"] = TrainerConfig(

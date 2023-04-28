@@ -239,6 +239,7 @@ class HashEncoding(Encoding):
         log2_hashmap_size: int = 19,
         features_per_level: int = 2,
         hash_init_scale: float = 0.001,
+        use_freenerf: bool = False,
         implementation: Literal["tcnn", "torch"] = "tcnn",
         interpolation: Optional[Literal["Nearest", "Linear", "Smoothstep"]] = None,
     ) -> None:
@@ -258,25 +259,26 @@ class HashEncoding(Encoding):
         self.hash_table *= hash_init_scale
         self.hash_table = nn.Parameter(self.hash_table)
 
+        self.use_freenerf = use_freenerf
         self.tcnn_encoding = None
-        if not TCNN_EXISTS and implementation == "tcnn":
-            print_tcnn_speed_warning("HashEncoding")
-        elif implementation == "tcnn":
-            encoding_config = {
-                "otype": "HashGrid",
-                "n_levels": self.num_levels,
-                "n_features_per_level": self.features_per_level,
-                "log2_hashmap_size": self.log2_hashmap_size,
-                "base_resolution": min_res,
-                "per_level_scale": growth_factor,
-            }
-            if interpolation is not None:
-                encoding_config["interpolation"] = interpolation
+        # if not TCNN_EXISTS and implementation == "tcnn":
+        #     print_tcnn_speed_warning("HashEncoding")
+        # elif implementation == "tcnn":
+        #     encoding_config = {
+        #         "otype": "HashGrid",
+        #         "n_levels": self.num_levels,
+        #         "n_features_per_level": self.features_per_level,
+        #         "log2_hashmap_size": self.log2_hashmap_size,
+        #         "base_resolution": min_res,
+        #         "per_level_scale": growth_factor,
+        #     }
+        #     if interpolation is not None:
+        #         encoding_config["interpolation"] = interpolation
 
-            self.tcnn_encoding = tcnn.Encoding(
-                n_input_dims=3,
-                encoding_config=encoding_config,
-            )
+        #     self.tcnn_encoding = tcnn.Encoding(
+        #         n_input_dims=3,
+        #         encoding_config=encoding_config,
+        #     )
 
         if not TCNN_EXISTS or self.tcnn_encoding is None:
             assert (
@@ -305,7 +307,7 @@ class HashEncoding(Encoding):
         x += self.hash_offset.to(x.device)
         return x
 
-    def pytorch_fwd(self, in_tensor: TensorType["bs":..., "input_dim"]) -> TensorType["bs":..., "output_dim"]:
+    def pytorch_fwd(self, in_tensor: TensorType["bs":..., "input_dim"], step: int) -> TensorType["bs":..., "output_dim"]:
         """Forward pass using pytorch. Significantly slower than TCNN implementation."""
 
         assert in_tensor.shape[-1] == 3
@@ -345,13 +347,15 @@ class HashEncoding(Encoding):
         encoded_value = f0312 * offset[..., 2:3] + f4756 * (
             1 - offset[..., 2:3]
         )  # [..., num_levels, features_per_level]
+        if self.use_freenerf:
+            encoded_value[..., 1 + int(step / 30000 * self.num_levels):, :] = 0.  # TODO: avoid hardcoding total steps
 
         return torch.flatten(encoded_value, start_dim=-2, end_dim=-1)  # [..., num_levels * features_per_level]
 
-    def forward(self, in_tensor: TensorType["bs":..., "input_dim"]) -> TensorType["bs":..., "output_dim"]:
-        if TCNN_EXISTS and self.tcnn_encoding is not None:
-            return self.tcnn_encoding(in_tensor)
-        return self.pytorch_fwd(in_tensor)
+    def forward(self, in_tensor: TensorType["bs":..., "input_dim"], step: int) -> TensorType["bs":..., "output_dim"]:
+        # if TCNN_EXISTS and self.tcnn_encoding is not None:
+        #     return self.tcnn_encoding(in_tensor)
+        return self.pytorch_fwd(in_tensor, step)
 
 
 class TensorCPEncoding(Encoding):
