@@ -236,7 +236,6 @@ class Trainer:
 
                 if step_check(step, self.config.steps_per_inpaint):
                     self.pipeline.inpaint(step, self.config.num_inpaint_cameras)
-                    # num_rays_per_batch = self.pipeline.datamanager.get_train_rays_per_batch()
                     self.viewer_state.update_camera(self, step, self.pipeline.datamanager.train_dataset)
 
                 self._update_viewer_state(step)

@@ -50,6 +50,7 @@ from nerfstudio.utils import profiler
 
 from nerfstudio.inpainter.stable_diffusion import StableDiffusionInpainter
 from nerfstudio.inpainter.image_to_image import ImageToImageInpainter
+from nerfstudio.camera_generator.base_camera_generator import CameraGenerator, CameraGeneratorConfig
 from nerfstudio.cameras.cameras import Cameras, CameraType
 
 import os
@@ -207,6 +208,8 @@ class VanillaPipelineConfig(cfg.InstantiateConfig):
     """specifies the datamanager config"""
     model: ModelConfig = ModelConfig()
     """specifies the model config"""
+    camera_generator: CameraGeneratorConfig = CameraGeneratorConfig()
+    """specifies the camera generator config"""
 
 
 class VanillaPipeline(Pipeline):
@@ -260,15 +263,15 @@ class VanillaPipeline(Pipeline):
             prompt='Real estate photo',
             device=device,
         )
+        self.timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        self.camera_generator: CameraGenerator = config.camera_generator.setup(
+            inpaint_save_dir=f'temp/inpaint-{self.timestamp}'
+        )
 
         self.world_size = world_size
         if world_size > 1:
             self._model = typing.cast(Model, DDP(self._model, device_ids=[local_rank], find_unused_parameters=True))
             dist.barrier(device_ids=[local_rank])
-        
-        self.timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        self.inpaint_save_dir = f'temp/inpaint-{self.timestamp}'
-        os.makedirs(self.inpaint_save_dir, exist_ok=True)
 
     @property
     def device(self):
@@ -306,8 +309,15 @@ class VanillaPipeline(Pipeline):
     def inpaint(self, step: int, num_inpaint_cameras: int):
         """Inpaint the cameras that need inpainting"""
         self.eval()
-        self.datamanager.train_dataset.prepare_inpaint_cameras_and_images(step, num_inpaint_cameras)
-        
+        # self.datamanager.train_dataset.prepare_inpaint_cameras_and_images(step, num_inpaint_cameras)  # only inpaint pending cameras
+        self.camera_generator.generate_inpaint_cameras(
+            step, 
+            num_inpaint_cameras,
+            self.datamanager.train_dataset,
+            self.model,
+            self.inpainter,
+        )
+        """
         cameras = self.datamanager.train_dataset.cameras.to(self.device)
         for index in self.datamanager.train_dataset.inpaint_indices():
             camera_ray_bundle = cameras.generate_rays(camera_indices=index)
@@ -318,9 +328,6 @@ class VanillaPipeline(Pipeline):
 
             save_path = os.path.join(self.inpaint_save_dir, f'frame_{step:04d}_{index:04d}_inpaint.png')
             inpaint_image.save(save_path)
-            # inpaint_image = inpaint_image.permute(1, 2, 0).cpu().numpy()
-            # inpaint_image = (inpaint_image * 255).astype(np.uint8)
-            # Image.fromarray(inpaint_image).save(save_path)
 
             render_image = image.cpu().numpy()
             render_image = (render_image * 255).astype(np.uint8)
@@ -328,7 +335,7 @@ class VanillaPipeline(Pipeline):
             Image.fromarray(render_image).save(save_path)
 
             self.datamanager.train_dataset.update_image(index, save_path)
-
+        """
         self.train()
 
     def forward(self):
