@@ -109,7 +109,8 @@ class NeRFEncoding(Encoding):
     """
 
     def __init__(
-        self, in_dim: int, num_frequencies: int, min_freq_exp: float, max_freq_exp: float, include_input: bool = False
+        self, in_dim: int, num_frequencies: int, min_freq_exp: float, max_freq_exp: float, include_input: bool = False,
+        use_freenerf: bool = False
     ) -> None:
         super().__init__(in_dim)
 
@@ -117,6 +118,7 @@ class NeRFEncoding(Encoding):
         self.min_freq = min_freq_exp
         self.max_freq = max_freq_exp
         self.include_input = include_input
+        self.use_freenerf = use_freenerf
 
     def get_out_dim(self) -> int:
         if self.in_dim is None:
@@ -129,6 +131,7 @@ class NeRFEncoding(Encoding):
     def forward(
         self,
         in_tensor: TensorType["bs":..., "input_dim"],
+        step: float,
         covs: Optional[TensorType["bs":..., "input_dim", "input_dim"]] = None,
     ) -> TensorType["bs":..., "output_dim"]:
         """Calculates NeRF encoding. If covariances are provided the encodings will be integrated as proposed
@@ -143,16 +146,22 @@ class NeRFEncoding(Encoding):
         in_tensor = 2 * torch.pi * in_tensor  # scale to [0, 2pi]
         freqs = 2 ** torch.linspace(self.min_freq, self.max_freq, self.num_frequencies).to(in_tensor.device)
         scaled_inputs = in_tensor[..., None] * freqs  # [..., "input_dim", "num_scales"]
-        scaled_inputs = scaled_inputs.view(*scaled_inputs.shape[:-2], -1)  # [..., "input_dim" * "num_scales"]
+        scaled_inputs = scaled_inputs.transpose(-2, -1).contiguous()  # [..., "num_scales", "input_dim"]
+        scaled_inputs = scaled_inputs.view(*scaled_inputs.shape[:-2], -1)  # [..., "num_scales * input_dim"]
 
         if covs is None:
-            encoded_inputs = torch.sin(torch.cat([scaled_inputs, scaled_inputs + torch.pi / 2.0], dim=-1))
+            encoded_inputs = torch.sin(
+                torch.stack([scaled_inputs, scaled_inputs + torch.pi / 2.0], dim=-1).view(*scaled_inputs.shape[:-1], -1),
+            )
         else:
             input_var = torch.diagonal(covs, dim1=-2, dim2=-1)[..., :, None] * freqs[None, :] ** 2
             input_var = input_var.reshape((*input_var.shape[:-2], -1))
             encoded_inputs = expected_sin(
-                torch.cat([scaled_inputs, scaled_inputs + torch.pi / 2.0], dim=-1), torch.cat(2 * [input_var], dim=-1)
+                torch.stack([scaled_inputs, scaled_inputs + torch.pi / 2.0], dim=-1).view(*scaled_inputs.shape[:-1], -1), 
+                torch.cat(2 * [input_var], dim=-1)
             )
+        if self.use_freenerf:
+            encoded_inputs[..., int(step * encoded_inputs.shape[-1]):] = 0.
 
         if self.include_input:
             encoded_inputs = torch.cat([encoded_inputs, in_tensor], dim=-1)
@@ -307,7 +316,7 @@ class HashEncoding(Encoding):
         x += self.hash_offset.to(x.device)
         return x
 
-    def pytorch_fwd(self, in_tensor: TensorType["bs":..., "input_dim"], step: int) -> TensorType["bs":..., "output_dim"]:
+    def pytorch_fwd(self, in_tensor: TensorType["bs":..., "input_dim"], step: float) -> TensorType["bs":..., "output_dim"]:
         """Forward pass using pytorch. Significantly slower than TCNN implementation."""
 
         assert in_tensor.shape[-1] == 3
@@ -348,11 +357,11 @@ class HashEncoding(Encoding):
             1 - offset[..., 2:3]
         )  # [..., num_levels, features_per_level]
         if self.use_freenerf:
-            encoded_value[..., 1 + int(step / 30000 * self.num_levels):, :] = 0.  # TODO: avoid hardcoding total steps
+            encoded_value[..., 1 + int(step * self.num_levels):, :] = 0.  # TODO: avoid hardcoding total steps
 
         return torch.flatten(encoded_value, start_dim=-2, end_dim=-1)  # [..., num_levels * features_per_level]
 
-    def forward(self, in_tensor: TensorType["bs":..., "input_dim"], step: int) -> TensorType["bs":..., "output_dim"]:
+    def forward(self, in_tensor: TensorType["bs":..., "input_dim"], step: float) -> TensorType["bs":..., "output_dim"]:
         # if TCNN_EXISTS and self.tcnn_encoding is not None:
         #     return self.tcnn_encoding(in_tensor)
         return self.pytorch_fwd(in_tensor, step)

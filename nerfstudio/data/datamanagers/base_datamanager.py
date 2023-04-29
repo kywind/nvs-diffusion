@@ -75,7 +75,7 @@ from nerfstudio.cameras.cameras import CameraType
 from nerfstudio.cameras.rays import RayBundle
 
 CONSOLE = Console(width=120)
-
+"""
 AnnotatedDataParserUnion = tyro.conf.OmitSubcommandPrefixes[  # Omit prefixes of flags in subcommands.
     tyro.extras.subcommand_type_from_defaults(
         {
@@ -95,6 +95,7 @@ AnnotatedDataParserUnion = tyro.conf.OmitSubcommandPrefixes[  # Omit prefixes of
         prefix_names=False,  # Omit prefixes in subcommands themselves.
     )
 ]
+"""
 """Union over possible dataparser types, annotated with metadata for tyro. This is the
 same as the vanilla union, but results in shorter subcommand names."""
 

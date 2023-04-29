@@ -260,7 +260,7 @@ class TCNNNerfactoField(Field):
             },
         )
 
-    def get_density(self, ray_samples: RaySamples, step: int) -> Tuple[TensorType, TensorType]:
+    def get_density(self, ray_samples: RaySamples, step: float) -> Tuple[TensorType, TensorType]:
         """Computes and returns the densities."""
         if self.spatial_distortion is not None:
             positions = ray_samples.frustums.get_positions()
@@ -278,7 +278,7 @@ class TCNNNerfactoField(Field):
 
         if self.use_freenerf:
             position_encoding = self.position_encoding_base(positions_flat)
-            length_pe = self.features_per_level * (1 + int(step / 30000 * self.num_levels))
+            length_pe = self.features_per_level * (1 + int(step * self.num_levels))
             pe = position_encoding[..., :length_pe]
             pe_padding = torch.zeros((*pe.shape[:-1], position_encoding.shape[-1] - length_pe), device=pe.device)
             p = torch.cat([pe, pe_padding], dim=-1)
@@ -296,7 +296,7 @@ class TCNNNerfactoField(Field):
         return density, base_mlp_out
 
     def get_outputs(
-        self, ray_samples: RaySamples, step: int, density_embedding: Optional[TensorType] = None
+        self, ray_samples: RaySamples, step: float, density_embedding: Optional[TensorType] = None
     ) -> Dict[FieldHeadNames, TensorType]:
         assert density_embedding is not None
         outputs = {}
@@ -420,7 +420,7 @@ class TorchNerfactoField(Field):
         for field_head in self.field_heads:
             field_head.set_in_dim(self.mlp_head.get_out_dim())  # type: ignore
 
-    def get_density(self, ray_samples: RaySamples, step: int) -> Tuple[TensorType, TensorType]:
+    def get_density(self, ray_samples: RaySamples, step: float) -> Tuple[TensorType, TensorType]:
         if self.spatial_distortion is not None:
             positions = ray_samples.frustums.get_positions()
             positions = self.spatial_distortion(positions)
@@ -432,7 +432,7 @@ class TorchNerfactoField(Field):
         return density, base_mlp_out
 
     def get_outputs(
-        self, ray_samples: RaySamples, step: int, density_embedding: Optional[TensorType] = None
+        self, ray_samples: RaySamples, step: float, density_embedding: Optional[TensorType] = None
     ) -> Dict[FieldHeadNames, TensorType]:
         outputs_shape = ray_samples.frustums.directions.shape[:-1]
 

@@ -96,7 +96,7 @@ class Field(nn.Module):
             density_embedding: Density embeddings to condition on.
         """
 
-    def forward(self, ray_samples: RaySamples, step: int = 0, compute_normals: bool = False) -> Dict[FieldHeadNames, TensorType]:
+    def forward(self, ray_samples: RaySamples, step: float = 0., compute_normals: bool = False) -> Dict[FieldHeadNames, TensorType]:
         """Evaluates the field at points along the ray.
 
         Args:

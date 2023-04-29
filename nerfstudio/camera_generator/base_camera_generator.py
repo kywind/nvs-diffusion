@@ -45,7 +45,7 @@ class CameraGenerator:
         os.makedirs(self.inpaint_save_dir, exist_ok=True)
         
 
-    def generate_inpaint_cameras(self, step: int, num_inpaint_images: int,
+    def generate_inpaint_cameras(self, step: float, num_inpaint_images: int,
             train_dataset: InputDataset, model: Model, inpainter: Inpainter):
 
         if self.config.pending_camera_only:
@@ -76,7 +76,7 @@ class CameraGenerator:
             self.add_new_camera_views(step, num_inpaint_images, train_dataset, model, inpainter)
 
 
-    def add_new_camera_views(self, step: int, num_inpaint_images: int, 
+    def add_new_camera_views(self, step: float, num_inpaint_images: int, 
             dataset: InputDataset, model: Model, inpainter: Inpainter):
         fx = dataset.cameras.fx[-1]
         fy = dataset.cameras.fy[-1]
@@ -116,7 +116,7 @@ class CameraGenerator:
         dataset._dataparser_outputs.image_filenames = new_images  # update images
 
     
-    def add_existing_camera_views(self, step: int, num_inpaint_images: int, dataset: InputDataset):
+    def add_existing_camera_views(self, step: float, num_inpaint_images: int, dataset: InputDataset):
         new_cams = []
         new_images = []
         num_cams = dataset.cameras.camera_to_worlds.shape[0]

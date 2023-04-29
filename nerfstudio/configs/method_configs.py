@@ -109,6 +109,31 @@ method_configs["nerfacto"] = TrainerConfig(
     vis="viewer",
 )
 
+
+method_configs["vanilla-nerf"] = TrainerConfig(
+    method_name="vanilla-nerf",
+    pipeline=VanillaPipelineConfig(
+        datamanager=VanillaDataManagerConfig(
+            # dataparser=BlenderDataParserConfig(),
+            dataparser=NerfstudioDataParserConfig(),
+        ),
+        model=VanillaModelConfig(_target=NeRFModel),
+    ),
+    optimizers={
+        "fields": {
+            "optimizer": RAdamOptimizerConfig(lr=5e-4, eps=1e-08),
+            "scheduler": None,
+        },
+        "temporal_distortion": {
+            "optimizer": RAdamOptimizerConfig(lr=5e-4, eps=1e-08),
+            "scheduler": None,
+        },
+    },
+    viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
+    vis="viewer",
+)
+"""
+
 method_configs["depth-nerfacto"] = TrainerConfig(
     method_name="depth-nerfacto",
     steps_per_eval_batch=500,
@@ -276,29 +301,6 @@ method_configs["semantic-nerfw"] = TrainerConfig(
     vis="viewer",
 )
 
-method_configs["vanilla-nerf"] = TrainerConfig(
-    method_name="vanilla-nerf",
-    pipeline=VanillaPipelineConfig(
-        datamanager=VanillaDataManagerConfig(
-            # dataparser=BlenderDataParserConfig(),
-            dataparser=NerfstudioDataParserConfig(),
-        ),
-        model=VanillaModelConfig(_target=NeRFModel),
-    ),
-    optimizers={
-        "fields": {
-            "optimizer": RAdamOptimizerConfig(lr=5e-4, eps=1e-08),
-            "scheduler": None,
-        },
-        "temporal_distortion": {
-            "optimizer": RAdamOptimizerConfig(lr=5e-4, eps=1e-08),
-            "scheduler": None,
-        },
-    },
-    viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
-    vis="viewer",
-)
-
 method_configs["tensorf"] = TrainerConfig(
     method_name="tensorf",
     steps_per_eval_batch=500,
@@ -438,6 +440,7 @@ method_configs["nerfplayer-ngp"] = TrainerConfig(
 external_methods, external_descriptions = discover_methods()
 method_configs.update(external_methods)
 descriptions.update(external_descriptions)
+"""
 
 AnnotatedBaseConfigUnion = tyro.conf.SuppressFixed[  # Don't show unparseable (fixed) arguments in helptext.
     tyro.conf.FlagConversionOff[

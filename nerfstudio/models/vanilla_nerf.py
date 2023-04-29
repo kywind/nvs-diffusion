@@ -58,6 +58,8 @@ class VanillaModelConfig(ModelConfig):
     """Specifies whether or not to include ray warping based on time."""
     temporal_distortion_params: Dict[str, Any] = to_immutable_dict({"kind": TemporalDistortionKind.DNERF})
     """Parameters to instantiate temporal distortion with"""
+    use_freenerf: bool = False
+    """Whether to use FreeNeRF or not."""
 
 
 class NeRFModel(Model):
@@ -87,10 +89,11 @@ class NeRFModel(Model):
 
         # fields
         position_encoding = NeRFEncoding(
-            in_dim=3, num_frequencies=10, min_freq_exp=0.0, max_freq_exp=8.0, include_input=True
+            in_dim=3, num_frequencies=10, min_freq_exp=0.0, max_freq_exp=8.0, include_input=True,
+            use_freenerf=self.config.use_freenerf,
         )
         direction_encoding = NeRFEncoding(
-            in_dim=3, num_frequencies=4, min_freq_exp=0.0, max_freq_exp=4.0, include_input=True
+            in_dim=3, num_frequencies=4, min_freq_exp=0.0, max_freq_exp=4.0, include_input=True,
         )
 
         self.field_coarse = NeRFField(
@@ -134,7 +137,7 @@ class NeRFModel(Model):
             param_groups["temporal_distortion"] = list(self.temporal_distortion.parameters())
         return param_groups
 
-    def get_outputs(self, ray_bundle: RayBundle):
+    def get_outputs(self, ray_bundle: RayBundle, step: float):
 
         if self.field_coarse is None or self.field_fine is None:
             raise ValueError("populate_fields() must be called before get_outputs")
@@ -146,7 +149,7 @@ class NeRFModel(Model):
             ray_samples_uniform.frustums.set_offsets(offsets)
 
         # coarse field:
-        field_outputs_coarse = self.field_coarse.forward(ray_samples_uniform)
+        field_outputs_coarse = self.field_coarse.forward(ray_samples_uniform, step)
         weights_coarse = ray_samples_uniform.get_weights(field_outputs_coarse[FieldHeadNames.DENSITY])
         rgb_coarse = self.renderer_rgb(
             rgb=field_outputs_coarse[FieldHeadNames.RGB],
@@ -162,7 +165,7 @@ class NeRFModel(Model):
             ray_samples_pdf.frustums.set_offsets(offsets)
 
         # fine field:
-        field_outputs_fine = self.field_fine.forward(ray_samples_pdf)
+        field_outputs_fine = self.field_fine.forward(ray_samples_pdf, step)
         weights_fine = ray_samples_pdf.get_weights(field_outputs_fine[FieldHeadNames.DENSITY])
         rgb_fine = self.renderer_rgb(
             rgb=field_outputs_fine[FieldHeadNames.RGB],
@@ -237,3 +240,8 @@ class NeRFModel(Model):
         }
         images_dict = {"img": combined_rgb, "accumulation": combined_acc, "depth": combined_depth}
         return metrics_dict, images_dict
+
+    def get_novel_view_rendering(self, outputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+        rgb = outputs["rgb_fine"]
+        acc = outputs["accumulation_fine"]
+        return rgb, acc

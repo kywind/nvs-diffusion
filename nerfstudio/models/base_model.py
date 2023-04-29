@@ -78,6 +78,7 @@ class Model(nn.Module):
         self.num_train_data = num_train_data
         self.kwargs = kwargs
         self.collider = None
+        self.current_step = None  # in range (0, 1) indicating the portion of training completed
 
         self.populate_modules()  # populate the modules
         self.callbacks = None
@@ -114,7 +115,7 @@ class Model(nn.Module):
         """
 
     @abstractmethod
-    def get_outputs(self, ray_bundle: RayBundle) -> Dict[str, torch.Tensor]:
+    def get_outputs(self, ray_bundle: RayBundle, step: float) -> Dict[str, torch.Tensor]:
         """Takes in a Ray Bundle and returns a dictionary of outputs.
 
         Args:
@@ -125,13 +126,17 @@ class Model(nn.Module):
             Outputs of model. (ie. rendered colors)
         """
 
-    def forward(self, ray_bundle: RayBundle, step: int = 0) -> Dict[str, torch.Tensor]:
+    def forward(self, ray_bundle: RayBundle, step: float = 0.) -> Dict[str, torch.Tensor]:
         """Run forward starting with a ray bundle. This outputs different things depending on the configuration
         of the model and whether or not the batch is provided (whether or not we are training basically)
 
         Args:
             ray_bundle: containing all the information needed to render that ray latents included
         """
+        if step > -1:
+            self.current_step = step  # record current step
+        else:
+            step = self.current_step  # not training, evaluate at a current step
 
         if self.collider is not None:
             ray_bundle = self.collider(ray_bundle)
@@ -174,7 +179,7 @@ class Model(nn.Module):
             start_idx = i
             end_idx = i + num_rays_per_chunk
             ray_bundle = camera_ray_bundle.get_row_major_sliced_ray_bundle(start_idx, end_idx)
-            outputs = self.forward(ray_bundle=ray_bundle)
+            outputs = self.forward(ray_bundle=ray_bundle, step=-1)
             for output_name, output in outputs.items():  # type: ignore
                 outputs_lists[output_name].append(output)
         outputs = {}

@@ -51,6 +51,7 @@ from nerfstudio.utils import profiler
 from nerfstudio.inpainter.stable_diffusion import StableDiffusionInpainter
 from nerfstudio.inpainter.image_to_image import ImageToImageInpainter
 from nerfstudio.camera_generator.base_camera_generator import CameraGenerator, CameraGeneratorConfig
+from nerfstudio.initializer.base_initializer import Initializer, InitializerConfig
 from nerfstudio.cameras.cameras import Cameras, CameraType
 
 import os
@@ -210,6 +211,8 @@ class VanillaPipelineConfig(cfg.InstantiateConfig):
     """specifies the model config"""
     camera_generator: CameraGeneratorConfig = CameraGeneratorConfig()
     """specifies the camera generator config"""
+    initializer: InitializerConfig = InitializerConfig()
+    """specifies the initializer config"""
 
 
 class VanillaPipeline(Pipeline):
@@ -268,6 +271,10 @@ class VanillaPipeline(Pipeline):
             inpaint_save_dir=f'temp/inpaint-{self.timestamp}'
         )
 
+        # initializing stage
+        self.initializer = config.initializer.setup()
+        self.initializer.initialize_scene(self.datamanager.train_dataset, self.inpainter)
+
         self.world_size = world_size
         if world_size > 1:
             self._model = typing.cast(Model, DDP(self._model, device_ids=[local_rank], find_unused_parameters=True))
@@ -306,7 +313,7 @@ class VanillaPipeline(Pipeline):
 
         return model_outputs, loss_dict, metrics_dict
 
-    def inpaint(self, step: int, num_inpaint_cameras: int):
+    def inpaint(self, step: float, num_inpaint_cameras: int):
         """Inpaint the cameras that need inpainting"""
         self.eval()
         # self.datamanager.train_dataset.prepare_inpaint_cameras_and_images(step, num_inpaint_cameras)  # only inpaint pending cameras
