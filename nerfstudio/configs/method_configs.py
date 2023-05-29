@@ -132,7 +132,6 @@ method_configs["vanilla-nerf"] = TrainerConfig(
     viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
     vis="viewer",
 )
-"""
 
 method_configs["depth-nerfacto"] = TrainerConfig(
     method_name="depth-nerfacto",
@@ -164,6 +163,7 @@ method_configs["depth-nerfacto"] = TrainerConfig(
     viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
     vis="viewer",
 )
+"""
 
 method_configs["volinga"] = TrainerConfig(
     method_name="volinga",

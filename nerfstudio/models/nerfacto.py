@@ -129,10 +129,10 @@ class NerfactoModelConfig(ModelConfig):
     """Whether to predict normals or not."""
     disable_scene_contraction: bool = False
     """Whether to disable scene contraction or not."""
-    use_tcnn: bool = False
+    use_tcnn: bool = True
     """Whether to use TCNN or not."""
     use_freenerf: bool = False
-    """Whether to use FreeNeRF or not."""
+    """Whether to use FreeNeRF or not. Only valid when use_tcnn is False."""
 
 
 class NerfactoModel(Model):
@@ -165,7 +165,6 @@ class NerfactoModel(Model):
                 hidden_dim_transient=self.config.hidden_dim_transient,
                 spatial_distortion=scene_contraction,
                 num_images=self.num_train_data,
-                use_freenerf=self.config.use_freenerf,
                 use_pred_normals=self.config.predict_normals,
                 use_average_appearance_embedding=self.config.use_average_appearance_embedding,
             )
