@@ -178,10 +178,14 @@ class DataManager(nn.Module):
         super().__init__()
         self.train_count = 0
         self.eval_count = 0
+        self.inited_train = False
+        self.inited_eval = False
         if self.train_dataset and self.test_mode != "inference":
             self.setup_train()
+            self.inited_train = True
         if self.eval_dataset and self.test_mode != "inference":
             self.setup_eval()
+            self.inited_eval = True
 
     def forward(self):
         """Blank forward method
@@ -324,6 +328,10 @@ class VanillaDataManagerConfig(DataManagerConfig):
     """
     patch_size: int = 1
     """Size of patch to sample from. If >1, patch-based sampling will be used."""
+    data_gen_dir: Optional[Path] = None
+    """Directory to save generated data to. If None, will not save generated data."""
+    do_eval: bool = True
+    """Whether to run eval."""
 
 
 class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
@@ -353,17 +361,21 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
         test_mode: Literal["test", "val", "inference"] = "val",
         world_size: int = 1,
         local_rank: int = 0,
+        max_num_cameras: int = 500,
         **kwargs,  # pylint: disable=unused-argument
     ):
         self.config = config
         self.device = device
         self.world_size = world_size
         self.local_rank = local_rank
+        self.max_num_cameras = max_num_cameras
         self.sampler = None
         self.test_mode = test_mode
         self.test_split = "test" if test_mode in ["test", "inference"] else "val"
         self.dataparser = self.config.dataparser
-        if self.config.data is not None:
+        if self.config.data_gen_dir is not None:
+            self.config.dataparser.data = Path(self.config.data_gen_dir)
+        elif self.config.data is not None:
             self.config.dataparser.data = Path(self.config.data)
         else:
             self.config.data = self.config.dataparser.data
@@ -371,7 +383,7 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
         self.train_dataparser_outputs = self.dataparser.get_dataparser_outputs(split="train")
 
         self.train_dataset = self.create_train_dataset()
-        self.eval_dataset = self.create_eval_dataset()
+        if self.config.do_eval: self.eval_dataset = self.create_eval_dataset()
         super().__init__()
 
     def create_train_dataset(self) -> InputDataset:
@@ -419,9 +431,12 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
         )
         self.iter_train_image_dataloader = iter(self.train_image_dataloader)
         self.train_pixel_sampler = self._get_pixel_sampler(self.train_dataset, self.config.train_num_rays_per_batch)
-        self.train_camera_optimizer = self.config.camera_optimizer.setup(
-            num_cameras=self.train_dataset.cameras.size, device=self.device
-        )
+        if not self.inited_train:
+            self.train_camera_optimizer = self.config.camera_optimizer.setup(
+                # num_cameras=self.train_dataset.cameras.size, 
+                num_cameras=self.max_num_cameras,
+                device=self.device
+            )
         self.train_ray_generator = RayGenerator(
             self.train_dataset.cameras.to(self.device),
             self.train_camera_optimizer,
@@ -442,9 +457,12 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
         )
         self.iter_eval_image_dataloader = iter(self.eval_image_dataloader)
         self.eval_pixel_sampler = self._get_pixel_sampler(self.eval_dataset, self.config.eval_num_rays_per_batch)
-        self.eval_camera_optimizer = self.config.camera_optimizer.setup(
-            num_cameras=self.eval_dataset.cameras.size, device=self.device
-        )
+        if not self.inited_eval:
+            self.eval_camera_optimizer = self.config.camera_optimizer.setup(
+                # num_cameras=self.eval_dataset.cameras.size, 
+                num_cameras=self.max_num_cameras,
+                device=self.device
+            )
         self.eval_ray_generator = RayGenerator(
             self.eval_dataset.cameras.to(self.device),
             self.eval_camera_optimizer,

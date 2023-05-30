@@ -85,10 +85,14 @@ class TrainerConfig(ExperimentConfig):
     """Path to config YAML file."""
     log_gradients: bool = False
     """Optionally log gradients during training"""
-    steps_per_inpaint: int = 100000
+    steps_per_inpaint: int = 1000000
     """Number of steps between inpainting."""
     num_inpaint_cameras: int = 10
     """Number of cameras to inpaint per inpainting step."""
+    gen_data: bool = False
+    """generate data for training"""
+    max_num_cameras: int = 500
+    """specifies maximum number of training data to use"""
 
 
 class Trainer:
@@ -143,7 +147,8 @@ class Trainer:
                 'inference': does not load any dataset into memory
         """
         self.pipeline = self.config.pipeline.setup(
-            device=self.device, test_mode=test_mode, world_size=self.world_size, local_rank=self.local_rank
+            device=self.device, test_mode=test_mode, world_size=self.world_size, local_rank=self.local_rank, 
+            gen_data=self.config.gen_data, max_num_cameras=self.config.max_num_cameras
         )
         self.optimizers = self.setup_optimizers()
 
@@ -235,7 +240,7 @@ class Trainer:
                     )
 
                 if step_check(step, self.config.steps_per_inpaint):
-                    self.pipeline.inpaint(step * 1. / self.configs.max_num_iterations, self.config.num_inpaint_cameras)
+                    self.pipeline.inpaint(step, self.config.num_inpaint_cameras)
                     self.viewer_state.update_camera(self, step, self.pipeline.datamanager.train_dataset)
 
                 self._update_viewer_state(step)

@@ -34,12 +34,10 @@ class Initializer:
     """Model class for initializing the scene."""
 
 
-    def __init__(self, config: InitializerConfig) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.config = config
-        
 
-    def initialize_scene(self, train_dataset: InputDataset, inpainter: Inpainter):
-        # cameras = train_dataset.cameras
+
+    def initialize_scene(self, **kwargs):
         return
         

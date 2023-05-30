@@ -68,7 +68,7 @@ class Model(nn.Module):
         self,
         config: ModelConfig,
         scene_box: SceneBox,
-        num_train_data: int,
+        num_train_data: int = 500,
         **kwargs,
     ) -> None:
         super().__init__()

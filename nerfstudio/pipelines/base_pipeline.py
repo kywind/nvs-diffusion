@@ -21,6 +21,7 @@ import typing
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from time import time
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Type, Union, cast
 
 import torch
@@ -239,12 +240,32 @@ class VanillaPipeline(Pipeline):
         test_mode: Literal["test", "val", "inference"] = "val",
         world_size: int = 1,
         local_rank: int = 0,
+        gen_data: bool = False,
+        max_num_cameras: int = 500,
     ):
         super().__init__()
         self.config = config
         self.test_mode = test_mode
+        self.gen_data = gen_data
+
+        self.timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        self.data_gen_dir = Path(os.path.join(self.config.datamanager.data, self.timestamp))
+        self.data_gen_dir.mkdir(exist_ok=True, parents=True)
+
+        if self.gen_data:
+            self.config.datamanager.data_gen_dir = self.data_gen_dir
+        
+            # initializing stage
+            self.initializer = config.initializer.setup(
+                initialize_save_dir=self.data_gen_dir
+            )
+            self.initializer.initialize_scene()
+        else:
+            self.config.datamanager.data_gen_dir = None
+
         self.datamanager: VanillaDataManager = config.datamanager.setup(
-            device=device, test_mode=test_mode, world_size=world_size, local_rank=local_rank
+            device=device, test_mode=test_mode, world_size=world_size, local_rank=local_rank, 
+            max_num_cameras=max_num_cameras
         )
         self.datamanager.to(device)
         # TODO(ethan): get rid of scene_bounds from the model
@@ -252,28 +273,22 @@ class VanillaPipeline(Pipeline):
 
         self._model = config.model.setup(
             scene_box=self.datamanager.train_dataset.scene_box,
-            num_train_data=len(self.datamanager.train_dataset),
+            num_train_data=max_num_cameras,
+            # num_train_data=len(self.datamanager.train_dataset),
             metadata=self.datamanager.train_dataset.metadata,
         )
         self.model.to(device)
 
-        # Inpainter
-        # self.inpainter = StableDiffusionInpainter(
-        #     prompt='Real estate photo',
-        #     device=device,
-        # )
+        # Inpainter (containing the diffusion model)
         self.inpainter = ImageToImageInpainter(
             prompt='Real estate photo',
             device=device,
         )
-        self.timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        
+        # Camera Generator (for updating the dataset)
         self.camera_generator: CameraGenerator = config.camera_generator.setup(
-            inpaint_save_dir=f'temp/inpaint-{self.timestamp}'
+            inpaint_save_dir=self.data_gen_dir
         )
-
-        # initializing stage
-        self.initializer = config.initializer.setup()
-        self.initializer.initialize_scene(self.datamanager.train_dataset, self.inpainter)
 
         self.world_size = world_size
         if world_size > 1:
@@ -313,36 +328,16 @@ class VanillaPipeline(Pipeline):
 
         return model_outputs, loss_dict, metrics_dict
 
-    def inpaint(self, step: float, num_inpaint_cameras: int):
+    def inpaint(self, step: int, num_inpaint_cameras: int):
         """Inpaint the cameras that need inpainting"""
         self.eval()
-        # self.datamanager.train_dataset.prepare_inpaint_cameras_and_images(step, num_inpaint_cameras)  # only inpaint pending cameras
         self.camera_generator.generate_inpaint_cameras(
             step, 
             num_inpaint_cameras,
-            self.datamanager.train_dataset,
+            self.datamanager,
             self.model,
             self.inpainter,
         )
-        """
-        cameras = self.datamanager.train_dataset.cameras.to(self.device)
-        for index in self.datamanager.train_dataset.inpaint_indices():
-            camera_ray_bundle = cameras.generate_rays(camera_indices=index)
-
-            outputs = self.model.get_outputs_for_camera_ray_bundle(camera_ray_bundle)
-            image, mask = self.model.get_novel_view_rendering(outputs)
-            inpaint_image = self.inpainter(image, mask, step=step)
-
-            save_path = os.path.join(self.inpaint_save_dir, f'frame_{step:04d}_{index:04d}_inpaint.png')
-            inpaint_image.save(save_path)
-
-            render_image = image.cpu().numpy()
-            render_image = (render_image * 255).astype(np.uint8)
-            save_path = os.path.join(self.inpaint_save_dir, f'frame_{step:04d}_{index:04d}.png')
-            Image.fromarray(render_image).save(save_path)
-
-            self.datamanager.train_dataset.update_image(index, save_path)
-        """
         self.train()
 
     def forward(self):

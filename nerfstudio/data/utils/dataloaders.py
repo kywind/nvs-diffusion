@@ -62,7 +62,7 @@ class CacheDataloader(DataLoader):
         super().__init__(dataset=dataset, **kwargs)  # This will set self.dataset
         self.num_times_to_repeat_images = num_times_to_repeat_images
         self.cache_all_images = (num_images_to_sample_from == -1) or (num_images_to_sample_from >= len(self.dataset))
-        self.num_images_to_sample_from = len(self.dataset) if self.cache_all_images else num_images_to_sample_from
+        self.num_images_to_sample_from = num_images_to_sample_from
         self.device = device
         self.collate_fn = collate_fn
         self.num_workers = kwargs.get("num_workers", 0)
@@ -93,8 +93,8 @@ class CacheDataloader(DataLoader):
 
     def _get_batch_list(self):
         """Returns a list of batches from the dataset attribute."""
-
-        indices = random.sample(range(len(self.dataset)), k=self.num_images_to_sample_from)
+        k_sample = len(self.dataset) if self.cache_all_images else self.num_images_to_sample_from
+        indices = random.sample(range(len(self.dataset)), k=k_sample)
         batch_list = []
         results = []
 
@@ -116,7 +116,7 @@ class CacheDataloader(DataLoader):
         """Returns a collated batch."""
         batch_list = self._get_batch_list()
         collated_batch = self.collate_fn(batch_list)
-        collated_batch = get_dict_to_torch(collated_batch, device=self.device)
+        collated_batch = get_dict_to_torch(collated_batch, device=self.device, exclude=["image"])
         return collated_batch
 
     def __iter__(self):
@@ -183,7 +183,7 @@ class EvalDataloader(DataLoader):
         """
         ray_bundle = self.cameras.generate_rays(camera_indices=image_idx, keep_shape=True)
         batch = self.input_dataset[image_idx]
-        batch = get_dict_to_torch(batch, device=self.device)
+        batch = get_dict_to_torch(batch, device=self.device, exclude=["image"])
         return ray_bundle, batch
 
 

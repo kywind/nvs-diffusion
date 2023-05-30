@@ -16,6 +16,7 @@ from nerfstudio.inpainter.base_inpainter import Inpainter
 from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.utils import profiler
 
+from nerfstudio.data.datamanagers.base_datamanager import DataManager
 from nerfstudio.data.datasets.base_dataset import InputDataset
 from nerfstudio.cameras.cameras import Cameras, CameraType
 
@@ -31,6 +32,9 @@ class CameraGeneratorConfig(InstantiateConfig):
     """target class to instantiate"""
     pending_camera_only: bool = True
     """only use pending cameras for inpainting"""
+    use_pending_images: bool = True
+    """use pending images for inpainting. Only valid when pending_camera_only is True"""
+
 
 
 class CameraGenerator:
@@ -45,38 +49,40 @@ class CameraGenerator:
         os.makedirs(self.inpaint_save_dir, exist_ok=True)
         
 
-    def generate_inpaint_cameras(self, step: float, num_inpaint_images: int,
-            train_dataset: InputDataset, model: Model, inpainter: Inpainter):
+    def generate_inpaint_cameras(self, step: int, num_inpaint_images: int,
+            datamanager: DataManager, model: Model, inpainter: Inpainter):
+
+        train_dataset = datamanager.train_dataset
 
         if self.config.pending_camera_only:
             self.add_existing_camera_views(step, num_inpaint_images, train_dataset)
-
-            cameras = train_dataset.cameras.to(model.device)
-            for index in range(len(train_dataset.image_filenames)):
-                if train_dataset.image_filenames[index] is not None:  # skip existing images
-                    continue
-
-                camera_ray_bundle = cameras.generate_rays(camera_indices=index)
-
-                outputs = model.get_outputs_for_camera_ray_bundle(camera_ray_bundle)
-                image, mask = model.get_novel_view_rendering(outputs)
-                inpaint_image = inpainter(image, mask, step=step)
-
-                save_path = os.path.join(self.inpaint_save_dir, f'frame_{step:04d}_{index:04d}_inpaint.png')
-                inpaint_image.save(save_path)
-
-                render_image = image.cpu().numpy()
-                render_image = (render_image * 255).astype(np.uint8)
-                save_path = os.path.join(self.inpaint_save_dir, f'frame_{step:04d}_{index:04d}.png')
-                Image.fromarray(render_image).save(save_path)
-
-                train_dataset.update_image(index, save_path)
-
         else:
             self.add_new_camera_views(step, num_inpaint_images, train_dataset, model, inpainter)
 
+        cameras = train_dataset.cameras.to(model.device)
+        for index in range(len(train_dataset.image_filenames)):
+            if train_dataset.image_filenames[index] is not None:  # skip existing images
+                continue
 
-    def add_new_camera_views(self, step: float, num_inpaint_images: int, 
+            camera_ray_bundle = cameras.generate_rays(camera_indices=index)
+
+            outputs = model.get_outputs_for_camera_ray_bundle(camera_ray_bundle)
+            image, mask = model.get_novel_view_rendering(outputs)
+            inpaint_image = inpainter(image, mask, step=step)
+
+            save_path = os.path.join(self.inpaint_save_dir, f'frame_{step:04d}_{index:04d}_inpaint.png')
+            inpaint_image.save(save_path)
+
+            render_image = image.cpu().numpy()
+            render_image = (render_image * 255).astype(np.uint8)
+            save_path = os.path.join(self.inpaint_save_dir, f'frame_{step:04d}_{index:04d}.png')
+            Image.fromarray(render_image).save(save_path)
+
+            train_dataset.update_image(index, save_path)
+        datamanager.setup_train()
+
+
+    def add_new_camera_views(self, step: int, num_inpaint_images: int, 
             dataset: InputDataset, model: Model, inpainter: Inpainter):
         fx = dataset.cameras.fx[-1]
         fy = dataset.cameras.fy[-1]
@@ -88,7 +94,17 @@ class CameraGenerator:
 
         new_cams = []
         new_images = []
-        camera_to_worlds = dataset.cameras.camera_to_worlds.clone()
+
+        num_cams = dataset.cameras.camera_to_worlds.shape[0]
+        assert len(dataset._dataparser_outputs.image_filenames) == num_cams
+
+        for i in range(num_cams):
+            t = dataset.cameras.camera_to_worlds[i, :3, 3]
+            R = dataset.cameras.camera_to_worlds[i, :3, :3]
+            
+            orig_cam = torch.cat([R, t.unsqueeze(-1)], dim=-1)
+            new_cams.append(orig_cam.clone())
+            new_images.append(dataset._dataparser_outputs.image_filenames[i])
 
         for i in range(num_inpaint_images):
             # TODO
@@ -116,7 +132,7 @@ class CameraGenerator:
         dataset._dataparser_outputs.image_filenames = new_images  # update images
 
     
-    def add_existing_camera_views(self, step: float, num_inpaint_images: int, dataset: InputDataset):
+    def add_existing_camera_views(self, step: int, num_inpaint_images: int, dataset: InputDataset):
         new_cams = []
         new_images = []
         num_cams = dataset.cameras.camera_to_worlds.shape[0]
@@ -128,9 +144,13 @@ class CameraGenerator:
         num_pending_cams = dataset.pending_cameras.camera_to_worlds.shape[0]
         new_pending_list = list(range(num_pending_cams))
         assert len(dataset._dataparser_outputs.pending_image_filenames) == num_pending_cams
-        assert num_pending_cams >= num_inpaint_images, "Not enough pending cameras to sample from"
+        # assert num_pending_cams >= num_inpaint_images, "Not enough pending cameras to sample from"
 
         # cam_samples = np.floor(np.linspace(0, num_pending_cams-1, num_inpaint_images)).astype(np.int64)
+        if len(new_pending_list) == 0:
+            return
+        elif len(new_pending_list) < num_inpaint_images:
+            num_inpaint_images = len(new_pending_list)
         cam_samples = np.random.choice(new_pending_list, num_inpaint_images, replace=False)
 
         for i in range(num_cams):
@@ -147,8 +167,10 @@ class CameraGenerator:
 
             new_cam = torch.cat([R, t.unsqueeze(-1)], dim=-1)
             new_cams.append(new_cam.clone())
-            new_images.append(None)
-            # new_images.append(dataset._dataparser_outputs.pending_image_filenames[j]
+            if self.config.use_pending_images:
+                new_images.append(dataset._dataparser_outputs.pending_image_filenames[j])
+            else:
+                new_images.append(None)
 
             new_pending_list.remove(j)
         

@@ -49,9 +49,12 @@ class InputDataset(Dataset):
         self.scene_box = deepcopy(dataparser_outputs.scene_box)
         self.metadata = deepcopy(dataparser_outputs.metadata)
         self.cameras = deepcopy(dataparser_outputs.cameras)
-        self.pending_cameras = deepcopy(dataparser_outputs.pending_cameras)
         self.cameras.rescale_output_resolution(scaling_factor=scale_factor)
-        self.pending_cameras.rescale_output_resolution(scaling_factor=scale_factor)
+        if dataparser_outputs.pending_cameras is not None:
+            self.pending_cameras = deepcopy(dataparser_outputs.pending_cameras)
+            self.pending_cameras.rescale_output_resolution(scaling_factor=scale_factor)
+        else:
+            self.pending_cameras = None
 
     def __len__(self):
         return len(self._dataparser_outputs.image_filenames)
@@ -100,7 +103,7 @@ class InputDataset(Dataset):
         data = {"image_idx": image_idx}
         data["image"] = image
         if self.has_masks:
-            raise Exception
+            raise NotImplementedError("Masks are not supported yet.")  # TODO
             mask_filepath = self._dataparser_outputs.mask_filenames[image_idx]
             data["mask"] = get_image_mask_tensor_from_path(filepath=mask_filepath, scale_factor=self.scale_factor)
             assert (
