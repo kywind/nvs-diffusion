@@ -79,12 +79,12 @@ class Text2Room(DataParser):
     def _generate_dataparser_outputs(self, split="train"):
         # pylint: disable=too-many-statements
 
-        # if self.config.data.suffix == ".json":
-        #     meta = load_from_json(self.config.data)
-        #     data_dir = self.config.data.parent
-        # else:
-        #     meta = load_from_json(self.config.data / "transforms.json")
-        #     data_dir = self.config.data
+        if self.config.data.suffix == ".json":
+            meta = load_from_json(self.config.data)
+            data_dir = self.config.data.parent
+        else:
+            meta = load_from_json(self.config.data / "transforms.json")
+            data_dir = self.config.data
 
         data_dir = self.config.data
 
@@ -96,54 +96,63 @@ class Text2Room(DataParser):
         # pending_poses = []
         num_skipped_image_filenames = 0
 
-        # fx_fixed = "fl_x" in meta
-        # fy_fixed = "fl_y" in meta
-        # cx_fixed = "cx" in meta
-        # cy_fixed = "cy" in meta
+        fx_fixed = "fl_x" in meta
+        fy_fixed = "fl_y" in meta
+        cx_fixed = "cx" in meta
+        cy_fixed = "cy" in meta
 
-        # height_fixed = "h" in meta
-        # width_fixed = "w" in meta
+        height_fixed = "h" in meta
+        width_fixed = "w" in meta
 
-        # distort_fixed = False
-        # for distort_key in ["k1", "k2", "k3", "p1", "p2"]:
-        #     if distort_key in meta:
-        #         distort_fixed = True
-        #         break
+        distort_fixed = False
+        for distort_key in ["k1", "k2", "k3", "p1", "p2"]:
+            if distort_key in meta:
+                distort_fixed = True
+                break
 
-        ## TODO
-        fl_x = 768.0
-        fl_y = 768.0
-        cx = 384.0
-        cy = 384.0
-        height = 768
-        width = 768
-        distort = [
-            camera_utils.get_distortion_params(
-                    k1=0.0,
-                    k2=0.0,
-                    k3=0.0,
-                    k4=0.0,
-                    p1=0.0,
-                    p2=0.0,
-                )
-        ]
-        frames = [{
-            "file_path": "00000.png",
-            "transform_matrix": [
-                [
-                    1.0, 0.0, 0.0, 0.0,
-                ],
-                [
-                    0.0, 1.0, 0.0, 0.0,
-                ],
-                [
-                    0.0, 0.0, 1.0, 0.0,
-                ],
-                [
-                    0.0, 0.0, 0.0, 1.0,
-                ],
-            ]
-        }]
+        fx = []
+        fy = []
+        cx = []
+        cy = []
+        height = []
+        width = []
+        distort = []
+
+        ## TODO trivial version
+        # fl_x = 768.0
+        # fl_y = 768.0
+        # cx = 384.0
+        # cy = 384.0
+        # height = 768
+        # width = 768
+        # distort = [
+        #     camera_utils.get_distortion_params(
+        #             k1=0.0,
+        #             k2=0.0,
+        #             k3=0.0,
+        #             k4=0.0,
+        #             p1=0.0,
+        #             p2=0.0,
+        #         )
+        # ]
+        # frames = [{
+        #     "file_path": "00000.png",
+        #     "transform_matrix": [
+        #         [
+        #             1.0, 0.0, 0.0, 0.0,
+        #         ],
+        #         [
+        #             0.0, 1.0, 0.0, 0.0,
+        #         ],
+        #         [
+        #             0.0, 0.0, 1.0, 0.0,
+        #         ],
+        #         [
+        #             0.0, 0.0, 0.0, 1.0,
+        #         ],
+        #     ]
+        # }]
+        frames = meta["frames"]
 
         for frame in frames:
             filepath = PurePath(frame["file_path"])
@@ -152,35 +161,35 @@ class Text2Room(DataParser):
                 num_skipped_image_filenames += 1
                 continue
 
-            # if not fx_fixed:
-            #     assert "fl_x" in frame, "fx not specified in frame"
-            #     fx.append(float(frame["fl_x"]))
-            # if not fy_fixed:
-            #     assert "fl_y" in frame, "fy not specified in frame"
-            #     fy.append(float(frame["fl_y"]))
-            # if not cx_fixed:
-            #     assert "cx" in frame, "cx not specified in frame"
-            #     cx.append(float(frame["cx"]))
-            # if not cy_fixed:
-            #     assert "cy" in frame, "cy not specified in frame"
-            #     cy.append(float(frame["cy"]))
-            # if not height_fixed:
-            #     assert "h" in frame, "height not specified in frame"
-            #     height.append(int(frame["h"]))
-            # if not width_fixed:
-            #     assert "w" in frame, "width not specified in frame"
-            #     width.append(int(frame["w"]))
-            # if not distort_fixed:
-                # distort.append(
-                #     camera_utils.get_distortion_params(
-                #         k1=float(frame["k1"]) if "k1" in frame else 0.0,
-                #         k2=float(frame["k2"]) if "k2" in frame else 0.0,
-                #         k3=float(frame["k3"]) if "k3" in frame else 0.0,
-                #         k4=float(frame["k4"]) if "k4" in frame else 0.0,
-                #         p1=float(frame["p1"]) if "p1" in frame else 0.0,
-                #         p2=float(frame["p2"]) if "p2" in frame else 0.0,
-                #     )
-                # )
+            if not fx_fixed:
+                assert "fl_x" in frame, "fx not specified in frame"
+                fx.append(float(frame["fl_x"]))
+            if not fy_fixed:
+                assert "fl_y" in frame, "fy not specified in frame"
+                fy.append(float(frame["fl_y"]))
+            if not cx_fixed:
+                assert "cx" in frame, "cx not specified in frame"
+                cx.append(float(frame["cx"]))
+            if not cy_fixed:
+                assert "cy" in frame, "cy not specified in frame"
+                cy.append(float(frame["cy"]))
+            if not height_fixed:
+                assert "h" in frame, "height not specified in frame"
+                height.append(int(frame["h"]))
+            if not width_fixed:
+                assert "w" in frame, "width not specified in frame"
+                width.append(int(frame["w"]))
+            if not distort_fixed:
+                distort.append(
+                    camera_utils.get_distortion_params(
+                        k1=float(frame["k1"]) if "k1" in frame else 0.0,
+                        k2=float(frame["k2"]) if "k2" in frame else 0.0,
+                        k3=float(frame["k3"]) if "k3" in frame else 0.0,
+                        k4=float(frame["k4"]) if "k4" in frame else 0.0,
+                        p1=float(frame["p1"]) if "p1" in frame else 0.0,
+                        p2=float(frame["p2"]) if "p2" in frame else 0.0,
+                    )
+                )
 
             image_filenames.append(fname)
             poses.append(np.array(frame["transform_matrix"]))
@@ -250,11 +259,11 @@ class Text2Room(DataParser):
             raise ValueError(f"Unknown dataparser split {split}")
             
 
-        # if "orientation_override" in meta:
-        #     orientation_method = meta["orientation_override"]
-        #     CONSOLE.log(f"[yellow] Dataset is overriding orientation method to {orientation_method}")
-        # else:
-        orientation_method = self.config.orientation_method
+        if "orientation_override" in meta:
+            orientation_method = meta["orientation_override"]
+            CONSOLE.log(f"[yellow] Dataset is overriding orientation method to {orientation_method}")
+        else:
+            orientation_method = self.config.orientation_method
 
         poses = torch.from_numpy(np.array(poses).astype(np.float32))
         poses, transform_matrix = camera_utils.auto_orient_and_center_poses(
@@ -264,15 +273,16 @@ class Text2Room(DataParser):
         )
 
         # Scale poses
-        scale_factor = 1.0
-        # if self.config.auto_scale_poses:
-        #     scale_factor /= float(torch.max(torch.abs(poses[:, :3, 3])))
-        # scale_factor *= self.config.scale_factor
-        # poses[:, :3, 3] *= scale_factor
+        ## TODO trivial version
+        # scale_factor = 1.0
+        if self.config.auto_scale_poses:
+            scale_factor /= float(torch.max(torch.abs(poses[:, :3, 3])))
+        scale_factor *= self.config.scale_factor
+        poses[:, :3, 3] *= scale_factor
 
         # Choose image_filenames and poses based on split, but after auto orient and scaling the poses.
         pending_image_filenames = deepcopy([image_filenames[i] for i in indices_pending])
-        # pending_poses = deepcopy(poses[indices_pending])
+        pending_poses = deepcopy(poses[indices_pending])
 
         image_filenames = [image_filenames[i] for i in indices]
         mask_filenames = [mask_filenames[i] for i in indices] if len(mask_filenames) > 0 else []
@@ -288,36 +298,37 @@ class Text2Room(DataParser):
             )
         )
 
-        # if "camera_model" in meta:
-        #     camera_type = CAMERA_MODEL_TO_TYPE[meta["camera_model"]]
-        # else:
-        camera_type = CameraType.PERSPECTIVE
+        if "camera_model" in meta:
+            camera_type = CAMERA_MODEL_TO_TYPE[meta["camera_model"]]
+        else:
+            camera_type = CameraType.PERSPECTIVE
 
         idx_tensor = torch.tensor(indices, dtype=torch.long)
-        # fx = float(meta["fl_x"]) if fx_fixed else torch.tensor(fx, dtype=torch.float32)[idx_tensor]
-        # fy = float(meta["fl_y"]) if fy_fixed else torch.tensor(fy, dtype=torch.float32)[idx_tensor]
-        # cx = float(meta["cx"]) if cx_fixed else torch.tensor(cx, dtype=torch.float32)[idx_tensor]
-        # cy = float(meta["cy"]) if cy_fixed else torch.tensor(cy, dtype=torch.float32)[idx_tensor]
-        # height = int(meta["h"]) if height_fixed else torch.tensor(height, dtype=torch.int32)[idx_tensor]
-        # width = int(meta["w"]) if width_fixed else torch.tensor(width, dtype=torch.int32)[idx_tensor]
-        fx = float(fl_x)
-        fy = float(fl_y)
-        cx = float(cx)
-        cy = float(cy)
-        height = int(height)
-        width = int(width)
+        fx = float(meta["fl_x"]) if fx_fixed else torch.tensor(fx, dtype=torch.float32)[idx_tensor]
+        fy = float(meta["fl_y"]) if fy_fixed else torch.tensor(fy, dtype=torch.float32)[idx_tensor]
+        cx = float(meta["cx"]) if cx_fixed else torch.tensor(cx, dtype=torch.float32)[idx_tensor]
+        cy = float(meta["cy"]) if cy_fixed else torch.tensor(cy, dtype=torch.float32)[idx_tensor]
+        height = int(meta["h"]) if height_fixed else torch.tensor(height, dtype=torch.int32)[idx_tensor]
+        width = int(meta["w"]) if width_fixed else torch.tensor(width, dtype=torch.int32)[idx_tensor]
+        ## TODO trivial version
+        # fx = float(fl_x)
+        # fy = float(fl_y)
+        # cx = float(cx)
+        # cy = float(cy)
+        # height = int(height)
+        # width = int(width)
 
-        # if distort_fixed:
-        #     distortion_params = camera_utils.get_distortion_params(
-        #         k1=float(meta["k1"]) if "k1" in meta else 0.0,
-        #         k2=float(meta["k2"]) if "k2" in meta else 0.0,
-        #         k3=float(meta["k3"]) if "k3" in meta else 0.0,
-        #         k4=float(meta["k4"]) if "k4" in meta else 0.0,
-        #         p1=float(meta["p1"]) if "p1" in meta else 0.0,
-        #         p2=float(meta["p2"]) if "p2" in meta else 0.0,
-        #     )
-        # else:
-        distortion_params = torch.stack(distort, dim=0)[idx_tensor]
+        if distort_fixed:
+            distortion_params = camera_utils.get_distortion_params(
+                k1=float(meta["k1"]) if "k1" in meta else 0.0,
+                k2=float(meta["k2"]) if "k2" in meta else 0.0,
+                k3=float(meta["k3"]) if "k3" in meta else 0.0,
+                k4=float(meta["k4"]) if "k4" in meta else 0.0,
+                p1=float(meta["p1"]) if "p1" in meta else 0.0,
+                p2=float(meta["p2"]) if "p2" in meta else 0.0,
+            )
+        else:
+            distortion_params = torch.stack(distort, dim=0)[idx_tensor]
 
         cameras = Cameras(
             fx=fx,
@@ -331,6 +342,7 @@ class Text2Room(DataParser):
             camera_type=camera_type,
         )
 
+        ## TODO trivial version
         pending_cameras = None
 
         # pending_cameras = Cameras(

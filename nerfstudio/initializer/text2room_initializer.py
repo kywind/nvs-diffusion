@@ -33,6 +33,7 @@ from PIL import Image
 import cv2
 import numpy as np
 import os
+import json
 
 from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionInpaintPipeline
 
@@ -80,6 +81,8 @@ class Text2RoomInitializer(Initializer):
             outputs: outputs from the inpainting model.
         """
 
+        frames = []
+
         if "prompt" in kwargs:
             prompt = kwargs["prompt"]
         else:
@@ -99,6 +102,31 @@ class Text2RoomInitializer(Initializer):
         save_path = os.path.join(self.initialize_save_dir, '00000.png')
         init_image.save(save_path)
 
+        frames.append(
+            {
+                'file_path': save_path,
+                'transform_matrix': [
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                    [0.0, 0.0, 0.0, 1.0]
+                ]
+            }
+        )
+
+        json_save_path = os.path.join(self.initialize_save_dir, 'transforms.json')
+        json_file = {}
+
+        json_file['fl_x'] = 768.0
+        json_file['fl_y'] = 768.0
+        json_file['cx'] = 384.0
+        json_file['cy'] = 384.0
+        json_file['w'] = 768
+        json_file['h'] = 768
+        json_file['frames'] = frames
+
+        with open(json_save_path, 'w') as f:
+                json.dump(json_file, f)
 
     def set_trajectory(self, trajectory: List[Dict[str, Any]]):
         pass
