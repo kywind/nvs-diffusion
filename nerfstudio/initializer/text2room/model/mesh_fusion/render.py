@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import open3d as o3d
 
-from model.mesh_fusion.util import (
+from nerfstudio.initializer.text2room.model.mesh_fusion.util import (
     unproject_points,
     get_camera,
     o3d_pcd_to_torch,

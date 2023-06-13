@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from model.iron_depth.models_normal.submodules import EESNU
+from nerfstudio.initializer.text2room.model.iron_depth.models_normal.submodules import EESNU
 
 
 class NNET(nn.Module):

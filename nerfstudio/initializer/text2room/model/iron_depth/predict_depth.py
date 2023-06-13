@@ -5,9 +5,9 @@ import torch
 from PIL import Image
 from torchvision import transforms
 
-import model.iron_depth.utils.utils as utils
-from model.iron_depth.models_normal.NNET import NNET
-from model.iron_depth.models.IronDepth import IronDepth
+import nerfstudio.initializer.text2room.model.iron_depth.utils.utils as utils
+from nerfstudio.initializer.text2room.model.iron_depth.models_normal.NNET import NNET
+from nerfstudio.initializer.text2room.model.iron_depth.models.IronDepth import IronDepth
 
 
 def load_iron_depth_model(type="scannet", iters=20, checkpoints_path="checkpoints", device="cuda:0"):

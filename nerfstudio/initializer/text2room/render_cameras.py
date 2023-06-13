@@ -1,5 +1,5 @@
-from model.text2room_pipeline import Text2RoomPipeline
-from model.utils.opt import get_default_parser
+from nerfstudio.initializer.text2room.model.text2room_pipeline import Text2RoomPipeline
+from nerfstudio.initializer.text2room.model.utils.opt import get_default_parser
 
 
 def main(args):

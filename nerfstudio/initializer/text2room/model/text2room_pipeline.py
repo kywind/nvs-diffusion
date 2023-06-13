@@ -9,12 +9,12 @@ from datetime import datetime
 from tqdm.auto import tqdm
 import trimesh
 
-from model.mesh_fusion.util import (
+from nerfstudio.initializer.text2room.model.mesh_fusion.util import (
     get_pinhole_intrinsics_from_fov,
     torch_to_trimesh
 )
 
-from model.mesh_fusion.render import (
+from nerfstudio.initializer.text2room.model.mesh_fusion.render import (
     features_to_world_space_mesh,
     render_mesh,
     save_mesh,
@@ -23,14 +23,14 @@ from model.mesh_fusion.render import (
     edge_threshold_filter
 )
 
-from model.iron_depth.predict_depth import load_iron_depth_model, predict_iron_depth
+from nerfstudio.initializer.text2room.model.iron_depth.predict_depth import load_iron_depth_model, predict_iron_depth
 
-from model.depth_alignment import depth_alignment
+from nerfstudio.initializer.text2room.model.depth_alignment import depth_alignment
 
-from model.trajectories import trajectory_util, pose_noise_util
-from model.trajectories.convert_to_nerf_convention import convert_pose_to_nerf_convention, convert_pose_from_nerf_convention
+from nerfstudio.initializer.text2room.model.trajectories import trajectory_util, pose_noise_util
+from nerfstudio.initializer.text2room.model.trajectories.convert_to_nerf_convention import convert_pose_to_nerf_convention, convert_pose_from_nerf_convention
 
-from model.utils.utils import (
+from nerfstudio.initializer.text2room.model.utils.utils import (
     visualize_depth_numpy,
     save_image,
     pil_to_torch,

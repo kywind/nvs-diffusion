@@ -17,3 +17,4 @@ __pycache__
 /outputs
 
 /*.sh
+/text2room_vis

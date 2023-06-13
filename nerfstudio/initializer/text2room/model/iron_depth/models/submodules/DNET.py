@@ -1,5 +1,5 @@
 import torch.nn as nn
-from model.iron_depth.models.submodules.D_submodules import Encoder, UpSampleGN
+from nerfstudio.initializer.text2room.model.iron_depth.models.submodules.D_submodules import Encoder, UpSampleGN
 
 
 class DNET(nn.Module):

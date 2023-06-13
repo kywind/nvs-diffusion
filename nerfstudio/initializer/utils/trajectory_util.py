@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from nerfstudio.initializer.text2room.model.mesh_fusion.util import get_extrinsics
+from nerfstudio.initializer.utils.mesh_util import get_extrinsics
 
 
 #######################
@@ -102,13 +102,30 @@ def _circle(i, steps=60, txmax=0, txmin=0, tymax=0, tymin=0, tzmax=0, tzmin=0, r
     return get_extrinsics(R, T)
 
 
-def _rot_left(i, steps=60, ty=0, rx=0):
+def _rot_left(i, steps=60, ty=0, rx=0, tx=0, tz=0):
     angle = i * 360 // steps
 
     T = _trans_x(0)
     T += _trans_y(ty)
+    T += _trans_x(tx)
+    T += _trans_z(tz)
     R = _rot_y(-angle)
     R += _rot_x(rx)
+
+    return get_extrinsics(R, T)
+
+
+def _rot_left_fix_t(i, steps=60, ty=0, rx=0, tx=0, tz=0):
+    angle = i * 360 // steps
+
+    R = _rot_y(-angle)
+    R += _rot_x(rx)
+
+    import ipdb; ipdb.set_trace()
+    T = _trans_x(0)
+    T += _trans_x(trans_x)
+    T += _trans_y(trans_y)
+    T += _trans_z(trans_z)
 
     return get_extrinsics(R, T)
 
@@ -211,37 +228,43 @@ def _double_sphere_rot_xz(i, steps, radius=4.0, height=0.0, phi=20.0):
 # PUBLIC TRAJECTORIES #
 #######################
 
+def forward_circle(tx=0, ty=0, tz=0, rx=0):
+    return _config_fn(_rot_left, ty=ty, rx=rx, tx=tx, tz=tz)
+
+def forward_circle_fix_t(tx=0, ty=0, tz=0, rx=0):
+    return _config_fn(_rot_left_fix_t, ty=ty, rx=rx, tx=tx, tz=tz)
+
 
 def forward(height=0, rot=0, txmax=2):
     return _config_fn(_circle, txmax=txmax, rymax=90, rymin=45, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
-def forward_small(height=0, rot=0):
-    return _config_fn(_circle, txmax=0.5, rymax=90, rymin=45, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
+# def forward_small(height=0, rot=0):
+#     return _config_fn(_circle, txmax=0.5, rymax=90, rymin=45, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
-def left_right(height=0, rot=0):
-    return _config_fn(_circle, tzmax=2, rymax=90, rymin=45, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
+# def left_right(height=0, rot=0):
+#     return _config_fn(_circle, tzmax=2, rymax=90, rymin=45, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
-def backward(height=0, rot=0):
-    return _config_fn(_circle, txmax=-2, rymax=90, rymin=45, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
+# def backward(height=0, rot=0):
+#     return _config_fn(_circle, txmax=-2, rymax=90, rymin=45, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
 def backward2(height=0, rot=0, txmax=1):
     return _config_fn(_circle, txmax=txmax, rymax=225, rymin=180, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
-def backward2_small(height=0, rot=0):
-    return _config_fn(_circle, txmax=0.5, rymax=225, rymin=180, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
+# def backward2_small(height=0, rot=0):
+#     return _config_fn(_circle, txmax=0.5, rymax=225, rymin=180, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
 def backward3(height=0, rot=0, txmax=1):
     return _config_fn(_circle, txmax=txmax, rymax=270, rymin=225, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
-def backward3_small(height=0, rot=0):
-    return _config_fn(_circle, txmax=0.5, rymax=270, rymin=225, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
+# def backward3_small(height=0, rot=0):
+#     return _config_fn(_circle, txmax=0.5, rymax=270, rymin=225, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
 def rot_left_up_down(height=0, rot=0):
@@ -260,25 +283,25 @@ def back_and_forth_forward_reverse(height=0, rot=0, tzmax=2):
     return _config_fn(_back_and_forth, txmax=0, tzmax=tzmax, rymax=-15, rymin=-60, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
-def back_and_forth_forward_reverse_small(height=0, rot=0):
-    return _config_fn(_back_and_forth, txmax=0, tzmax=0.5, rymax=-15, rymin=-60, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
+# def back_and_forth_forward_reverse_small(height=0, rot=0):
+#     return _config_fn(_back_and_forth, txmax=0, tzmax=0.5, rymax=-15, rymin=-60, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
 def back_and_forth_backward_reverse(height=0, rot=0, tzmax=2):
     return _config_fn(_back_and_forth, txmax=0, tzmax=tzmax, rymax=165, rymin=120, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
-def back_and_forth_backward_reverse_small(height=0, rot=0):
-    return _config_fn(_back_and_forth, txmax=0, tzmax=0.5, rymax=165, rymin=120, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
+# def back_and_forth_backward_reverse_small(height=0, rot=0):
+#     return _config_fn(_back_and_forth, txmax=0, tzmax=0.5, rymax=165, rymin=120, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
-def back_and_forth_backward_reverse2(height=0, rot=0):
-    return _config_fn(_back_and_forth, txmax=0, tzmax=3, rymax=165, rymin=60, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
+# def back_and_forth_backward_reverse2(height=0, rot=0):
+#     return _config_fn(_back_and_forth, txmax=0, tzmax=3, rymax=165, rymin=60, tymin=height, tymax=height, rxmin=rot, rxmax=rot)
 
 
 def sphere_rot(radius=4.0, height=0.0, phi=20.0):
     return _config_fn(_sphere_rot_xz, radius=radius, height=height, phi=phi)
 
 
-def double_rot(radius=4.0, height=0.0, phi=2.0):
-    return _config_fn(_double_sphere_rot_xz, radius=radius, height=height, phi=phi)
+# def double_rot(radius=4.0, height=0.0, phi=2.0):
+#     return _config_fn(_double_sphere_rot_xz, radius=radius, height=height, phi=phi)

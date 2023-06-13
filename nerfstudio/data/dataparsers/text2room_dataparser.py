@@ -274,10 +274,10 @@ class Text2Room(DataParser):
 
         # Scale poses
         ## TODO trivial version
-        # scale_factor = 1.0
-        if self.config.auto_scale_poses:
-            scale_factor /= float(torch.max(torch.abs(poses[:, :3, 3])))
-        scale_factor *= self.config.scale_factor
+        scale_factor = 1.0
+        # if self.config.auto_scale_poses:
+        #     scale_factor /= float(torch.max(torch.abs(poses[:, :3, 3])))
+        # scale_factor *= self.config.scale_factor
         poses[:, :3, 3] *= scale_factor
 
         # Choose image_filenames and poses based on split, but after auto orient and scaling the poses.
@@ -361,7 +361,7 @@ class Text2Room(DataParser):
         cameras.rescale_output_resolution(scaling_factor=1.0 / self.downscale_factor)
         # pending_cameras.rescale_output_resolution(scaling_factor=1.0 / self.downscale_factor)
 
-        assert len(mask_filenames) == 0 and len(depth_filenames) == 0, "Not implemented yet"
+        assert len(mask_filenames) == 0, "Not implemented yet"
         dataparser_outputs = DataparserOutputs(
             image_filenames=image_filenames,
             pending_image_filenames=pending_image_filenames,

@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
-from model.iron_depth.models.submodules.DNET import DNET
-from model.iron_depth.models.submodules.Dr_submodules import LSPN
+from nerfstudio.initializer.text2room.model.iron_depth.models.submodules.DNET import DNET
+from nerfstudio.initializer.text2room.model.iron_depth.models.submodules.Dr_submodules import LSPN
 
 
 # downsample the predicted norm, predicted kappa (surface normal confidence), and pos (ray with unit depth)

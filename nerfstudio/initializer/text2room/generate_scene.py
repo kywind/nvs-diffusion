@@ -2,9 +2,9 @@ import os
 import json
 from PIL import Image
 
-from model.text2room_pipeline import Text2RoomPipeline
-from model.utils.opt import get_default_parser
-from model.utils.utils import save_poisson_mesh, generate_first_image
+from nerfstudio.initializer.text2room.model.text2room_pipeline import Text2RoomPipeline
+from nerfstudio.initializer.text2room.model.utils.opt import get_default_parser
+from nerfstudio.initializer.text2room.model.utils.utils import save_poisson_mesh, generate_first_image
 
 import torch
 
