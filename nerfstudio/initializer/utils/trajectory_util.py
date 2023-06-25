@@ -115,17 +115,19 @@ def _rot_left(i, steps=60, ty=0, rx=0, tx=0, tz=0):
     return get_extrinsics(R, T)
 
 
-def _rot_left_fix_t(i, steps=60, ty=0, rx=0, tx=0, tz=0):
+def _rot_left_fix_t(i, steps=60, ty=0., rx=0., tx=0., tz=0.):
     angle = i * 360 // steps
 
     R = _rot_y(-angle)
     R += _rot_x(rx)
-
-    import ipdb; ipdb.set_trace()
     T = _trans_x(0)
-    T += _trans_x(trans_x)
-    T += _trans_y(trans_y)
-    T += _trans_z(trans_z)
+
+    R_matrix = get_extrinsics(R, T)[:3, :3]
+    T_matrix = -R_matrix @ torch.tensor([tx, ty, tz]).to(torch.float32)
+
+    T += _trans_x(T_matrix[0])
+    T += _trans_y(T_matrix[1])
+    T += _trans_z(T_matrix[2])
 
     return get_extrinsics(R, T)
 

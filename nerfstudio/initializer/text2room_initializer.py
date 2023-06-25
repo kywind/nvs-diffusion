@@ -60,6 +60,8 @@ class Text2RoomInitializerConfig(InitializerConfig):
 
     _target: Type = field(default_factory=lambda: Text2RoomInitializer)
     """target class to instantiate"""
+    n_images: int = 19
+    """number of images to generate per trajectory"""
 
 
 class Text2RoomInitializer(Initializer):
@@ -121,9 +123,9 @@ class Text2RoomInitializer(Initializer):
         if "prompt" in kwargs:
             prompt = kwargs["prompt"]
         else:
-            prompt = " living room with a lit furnace, couch and cozy curtains, bright lamps that make the room look well-lit"
+            prompt = "living room with a lit furnace, couch and cozy curtains, bright lamps that make the room look well-lit"
 
-        self.orig_n_images = 10
+        self.orig_n_images = self.config.n_images
         self.orig_prompt = prompt
         self.orig_prompt = prompt
         self.orig_negative_prompt = "blurry, bad art, blurred, text, watermark, plant, nature"
@@ -166,7 +168,7 @@ class Text2RoomInitializer(Initializer):
         self.seen_poses = []
         offset = 0
 
-        traj_file = 'nerfstudio/initializer/text2room/model/trajectories/examples/room.json'
+        traj_file = 'nerfstudio/initializer/trajectories/room.json'
         trajectories = json.load(open(traj_file, "r"))
 
         self.json_file = self.build_nerf_transforms_header()
@@ -181,8 +183,7 @@ class Text2RoomInitializer(Initializer):
 
         # ---------- MAIN LOOP -----------
         self.setup_models()
-        self.setup_start_image(offset)
-        offset += 1
+        offset = self.setup_start_image(offset)
 
         for t in trajectories:
             self.set_trajectory(t)
@@ -252,7 +253,7 @@ class Text2RoomInitializer(Initializer):
 
                 # update pose
                 self.set_trajectory(self.trajectory_dict)
-                self.world_to_cam = self.get_next_pose_in_trajectory(pos)
+                self.world_to_cam = self.trajectory_fn(pos, self.n_images).to(self.device)
                 self.seen_poses[-1] = self.world_to_cam
 
                 # render new images
@@ -291,7 +292,7 @@ class Text2RoomInitializer(Initializer):
         # predict depth, add to 3D structure, save images
         self.add_next_image(pos, offset, save_files, file_suffix)
         # update dataset
-        self.append_nerf_extrinsic(offset + pos, self.current_image_pil)
+        self.append_nerf_extrinsic(offset + pos, self.current_image_pil, self.predicted_depth, self.current_depth_pil)
 
         # update bounding box
         min_bound = torch.amin(self.vertices, dim=-1)
@@ -436,15 +437,19 @@ class Text2RoomInitializer(Initializer):
         save_image(self.current_image_pil, "rgb", offset, self.rgb_path)
 
         # predict depth, add 3D structure, save image
-        self.add_next_image(pos=0, offset=offset)
-        # add to seen poses
-        self.seen_poses.append(self.world_to_cam.clone())
-        # update dataset
-        self.append_nerf_extrinsic(offset, self.current_image_pil)
+        save_first_frame = True
+        if save_first_frame:
+            self.add_next_image(pos=0, offset=offset)
+            offset += 1
+            # add to seen poses
+            self.seen_poses.append(self.world_to_cam.clone())
+            # update dataset
+            self.append_nerf_extrinsic(offset, self.current_image_pil, self.predicted_depth, self.current_depth_pil)
         # save image
         if save_file:
             image_util.save_image(self.current_image_pil, f"rgb{file_suffix}", offset, self.rgb_path)
 
+        return offset
 
     def add_next_image(self, pos, offset, save_files=True, file_suffix=""):
         """
@@ -491,7 +496,7 @@ class Text2RoomInitializer(Initializer):
         self.add_vertices_and_faces(predicted_depth)
 
         # save current meshes
-        self.save_scene_every_nth = 50
+        self.save_scene_every_nth = 10
         if save_files and self.save_scene_every_nth > 0 and (offset + pos) % self.save_scene_every_nth == 0:
             self.save_mesh(f"fused_until_frame{file_suffix}_{offset + pos:04}.ply")
     
@@ -582,13 +587,12 @@ class Text2RoomInitializer(Initializer):
             "frames": []
         }
 
-    def append_nerf_extrinsic(self, image_id, image, depth=None):  # PIL image
+    def append_nerf_extrinsic(self, image_id, image, depth=None, depth_vis=None):  # PIL image
         """
         given an image, save the extrinsic to construct the transform.json for nerfstudio
         """
         p = convert_pose_to_nerf_convention(self.world_to_cam)
         save_path = f'{image_id:05d}.png'
-        depth_save_path = f'{image_id:05d}_depth.png'
         image.save(os.path.join(self.initialize_save_dir, save_path))
         if depth is None:
             self.json_file["frames"].append({
@@ -596,7 +600,10 @@ class Text2RoomInitializer(Initializer):
                 "file_path": save_path,
             })
         else:
-            depth.save(os.path.join(self.initialize_save_dir, depth_save_path))
+            depth_save_path = f'{image_id:05d}_depth.npy'
+            if depth_vis is not None:
+                depth_vis.save(os.path.join(self.initialize_save_dir, f'{image_id:05d}_depth.png'))
+            np.save(os.path.join(self.initialize_save_dir, depth_save_path), depth.cpu().numpy())
             self.json_file["frames"].append({
                 "transform_matrix": p.cpu().numpy().tolist(),
                 "file_path": save_path,

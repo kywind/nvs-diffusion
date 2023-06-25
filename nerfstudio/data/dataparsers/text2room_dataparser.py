@@ -65,7 +65,7 @@ class Text2RoomDataParserConfig(DataParserConfig):
     """The fraction of images to use for training. The remaining images are for eval."""
     num_init_images: int = 10000
     """The number of images to use for initialization."""
-    depth_unit_scale_factor: float = 1e-3
+    depth_unit_scale_factor: float = 1
     """Scales the depth values to meters. Default value is 0.001 for a millimeter to meter conversion."""
 
 

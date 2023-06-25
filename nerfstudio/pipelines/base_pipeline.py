@@ -53,7 +53,10 @@ from nerfstudio.inpainter.stable_diffusion import StableDiffusionInpainter
 from nerfstudio.inpainter.image_to_image import ImageToImageInpainter
 from nerfstudio.camera_generator.base_camera_generator import CameraGenerator, CameraGeneratorConfig
 from nerfstudio.initializer.base_initializer import Initializer, InitializerConfig
+from nerfstudio.initializer.sds.trainer import SDSTrainer, SDSTrainerConfig
 from nerfstudio.cameras.cameras import Cameras, CameraType
+
+from nerfstudio.initializer.sds.dataset import SDSDataset
 
 import os
 import numpy as np
@@ -214,6 +217,8 @@ class VanillaPipelineConfig(cfg.InstantiateConfig):
     """specifies the camera generator config"""
     initializer: InitializerConfig = InitializerConfig()
     """specifies the initializer config"""
+    sds_trainer: SDSTrainerConfig = SDSTrainerConfig()
+    """specifies the sds trainer config"""
 
 
 class VanillaPipeline(Pipeline):
@@ -242,6 +247,7 @@ class VanillaPipeline(Pipeline):
         local_rank: int = 0,
         gen_data: bool = False,
         max_num_cameras: int = 500,
+        max_iter: int = 10000,
     ):
         super().__init__()
         self.config = config
@@ -290,6 +296,14 @@ class VanillaPipeline(Pipeline):
             inpaint_save_dir=self.data_gen_dir
         )
 
+        # TODO SDS Loss
+        self.sds_train_loader = SDSDataset(device=device, mode='train', epoch_length=max_iter).dataloader()
+        self.sds_trainer = config.sds_trainer.setup(
+            model=self.model,
+            device=device,
+            fp16=True,
+        )
+
         self.world_size = world_size
         if world_size > 1:
             self._model = typing.cast(Model, DDP(self._model, device_ids=[local_rank], find_unused_parameters=True))
@@ -310,6 +324,7 @@ class VanillaPipeline(Pipeline):
             step: current iteration step to update sampler if using DDP (distributed)
         """
         ray_bundle, batch = self.datamanager.next_train(step)
+        # import ipdb; ipdb.set_trace()
         model_outputs = self.model(ray_bundle, step)
         metrics_dict = self.model.get_metrics_dict(model_outputs, batch)
 
@@ -326,6 +341,18 @@ class VanillaPipeline(Pipeline):
 
         loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
 
+        # loss_dict: dict_keys(['rgb_loss', 'interlevel_loss', 'distortion_loss', 'depth_loss'])
+        # model_outputs: dict_keys(['rgb', 'accumulation', 'depth', 'weights_list', 'ray_samples_list', 'prop_depth_0', 'prop_depth_1', 'directions_norm'])
+        # metrics_dict: dict_keys(['psnr', 'distortion', 'depth_loss', 'camera_opt_translation', 'camera_opt_rotation'])
+
+        data = next(self.sds_train_loader) # H, W, rays_o, rays_d, dir, mvp, polar, azimuth, radius
+        sds_loss_dict, sds_outputs, sds_metrics = self.sds_trainer.train_step(step, data)
+        
+        loss_dict.update(sds_loss_dict)
+        model_outputs.update(sds_outputs)
+        metrics_dict.update(sds_metrics)
+        import ipdb; ipdb.set_trace()
+        
         return model_outputs, loss_dict, metrics_dict
 
     def inpaint(self, step: int, num_inpaint_cameras: int):

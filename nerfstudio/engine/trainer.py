@@ -93,6 +93,8 @@ class TrainerConfig(ExperimentConfig):
     """generate data for training"""
     max_num_cameras: int = 500
     """specifies maximum number of training data to use"""
+    save_guidance_step: int = 1000
+    """Number of steps between saving guidance images."""
 
 
 class Trainer:
@@ -148,7 +150,7 @@ class Trainer:
         """
         self.pipeline = self.config.pipeline.setup(
             device=self.device, test_mode=test_mode, world_size=self.world_size, local_rank=self.local_rank, 
-            gen_data=self.config.gen_data, max_num_cameras=self.config.max_num_cameras
+            gen_data=self.config.gen_data, max_num_cameras=self.config.max_num_cameras, max_iter=self.config.max_num_iterations
         )
         self.optimizers = self.setup_optimizers()
 
@@ -256,6 +258,9 @@ class Trainer:
 
                 if step_check(step, self.config.steps_per_save):
                     self.save_checkpoint(step)
+
+                if step_check(step, self.config.save_guidance_step):
+                    self.pipeline.sds_trainer.save_guidance_images(step)
 
                 writer.write_out_storage()
 
