@@ -120,15 +120,15 @@ class SDSTrainer:
             self.embeddings[key] = {}
         self.prepare_embeddings()
 
-        self.pearson = PearsonCorrCoef().to(self.device)
+        # self.pearson = PearsonCorrCoef().to(self.device)
 
         # self.optimizer = Adan(model.get_params(lr=5e-3), eps=1e-8, weight_decay=2e-5, max_grad_norm=5.0, foreach=False)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=0.001, weight_decay=5e-4) # naive adam
+        # self.optimizer = optim.Adam(self.model.parameters(), lr=0.001, weight_decay=5e-4) # naive adam
         # self.lr_scheduler = optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda epoch: 1) # fake scheduler
-        self.lr_scheduler = optim.lr_scheduler.LambdaLR(self.optimizer, lambda iter: 0.1 ** min(iter / self.iters, 1))
+        # self.lr_scheduler = optim.lr_scheduler.LambdaLR(self.optimizer, lambda iter: 0.1 ** min(iter / self.iters, 1))
 
-        self.ema = ExponentialMovingAverage(self.model.parameters(), decay=0.95)
-        self.scaler = torch.cuda.amp.GradScaler(enabled=self.fp16)
+        # self.ema = ExponentialMovingAverage(self.model.parameters(), decay=0.95)
+        # self.scaler = torch.cuda.amp.GradScaler(enabled=self.fp16)
 
         # variable init
         self.bg_radius = -1

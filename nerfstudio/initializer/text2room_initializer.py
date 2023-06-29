@@ -193,6 +193,16 @@ class Text2RoomInitializer(Initializer):
         json_save_path = os.path.join(self.initialize_save_dir, 'transforms.json')
         with open(json_save_path, 'w') as f:
             json.dump(self.json_file, f)
+        
+        self.post_initialization()
+
+    def post_initialization(self):
+        """
+        post initialization
+        """
+        del self.inpaint_pipe
+        del self.iron_depth_n_net
+        del self.iron_depth_model
 
     def set_trajectory(self, trajectory_dict: Any):
         """
@@ -449,6 +459,7 @@ class Text2RoomInitializer(Initializer):
         if save_file:
             image_util.save_image(self.current_image_pil, f"rgb{file_suffix}", offset, self.rgb_path)
 
+        del pipe
         return offset
 
     def add_next_image(self, pos, offset, save_files=True, file_suffix=""):

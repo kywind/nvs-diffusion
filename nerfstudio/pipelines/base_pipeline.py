@@ -246,6 +246,7 @@ class VanillaPipeline(Pipeline):
         world_size: int = 1,
         local_rank: int = 0,
         gen_data: bool = False,
+        use_sds: bool = False,
         max_num_cameras: int = 500,
         max_iter: int = 10000,
     ):
@@ -253,6 +254,7 @@ class VanillaPipeline(Pipeline):
         self.config = config
         self.test_mode = test_mode
         self.gen_data = gen_data
+        self.use_sds = use_sds
 
         self.timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
         self.data_gen_dir = Path(os.path.join(self.config.datamanager.data, self.timestamp))
@@ -286,10 +288,11 @@ class VanillaPipeline(Pipeline):
         self.model.to(device)
 
         # Inpainter (containing the diffusion model)
-        self.inpainter = ImageToImageInpainter(
-            prompt='Real estate photo',
-            device=device,
-        )
+        # self.inpainter = ImageToImageInpainter(
+        #     prompt='Real estate photo',
+        #     device=device,
+        # )
+        self.inpainter = None
         
         # Camera Generator (for updating the dataset)
         self.camera_generator: CameraGenerator = config.camera_generator.setup(
@@ -297,12 +300,13 @@ class VanillaPipeline(Pipeline):
         )
 
         # TODO SDS Loss
-        self.sds_train_loader = SDSDataset(device=device, mode='train', epoch_length=max_iter).dataloader()
-        self.sds_trainer = config.sds_trainer.setup(
-            model=self.model,
-            device=device,
-            fp16=True,
-        )
+        if self.use_sds:
+            self.sds_train_loader = SDSDataset(device=device, mode='train', epoch_length=max_iter).dataloader()
+            self.sds_trainer = config.sds_trainer.setup(
+                model=self.model,
+                device=device,
+                fp16=True,
+            )
 
         self.world_size = world_size
         if world_size > 1:
@@ -340,18 +344,17 @@ class VanillaPipeline(Pipeline):
                 )
 
         loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
-
+        # import ipdb; ipdb.set_trace()
         # loss_dict: dict_keys(['rgb_loss', 'interlevel_loss', 'distortion_loss', 'depth_loss'])
         # model_outputs: dict_keys(['rgb', 'accumulation', 'depth', 'weights_list', 'ray_samples_list', 'prop_depth_0', 'prop_depth_1', 'directions_norm'])
         # metrics_dict: dict_keys(['psnr', 'distortion', 'depth_loss', 'camera_opt_translation', 'camera_opt_rotation'])
-
-        data = next(self.sds_train_loader) # H, W, rays_o, rays_d, dir, mvp, polar, azimuth, radius
-        sds_loss_dict, sds_outputs, sds_metrics = self.sds_trainer.train_step(step, data)
+        if self.use_sds:
+            data = next(self.sds_train_loader) # H, W, rays_o, rays_d, dir, mvp, polar, azimuth, radius
+            sds_loss_dict, sds_outputs, sds_metrics = self.sds_trainer.train_step(step, data)
         
-        loss_dict.update(sds_loss_dict)
-        model_outputs.update(sds_outputs)
-        metrics_dict.update(sds_metrics)
-        import ipdb; ipdb.set_trace()
+            loss_dict.update(sds_loss_dict)
+            model_outputs.update(sds_outputs)
+            metrics_dict.update(sds_metrics)
         
         return model_outputs, loss_dict, metrics_dict
 

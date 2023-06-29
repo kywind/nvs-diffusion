@@ -183,7 +183,7 @@ def circle_poses(device, radius=torch.tensor([3.2]), theta=torch.tensor([60]), p
 
 
 class SDSDataset:
-    def __init__(self, device, mode='train', H=64, W=64, epoch_length=100):
+    def __init__(self, device, mode='train', H=32, W=32, epoch_length=100):
         super().__init__()
 
         self.batch_size = 1
