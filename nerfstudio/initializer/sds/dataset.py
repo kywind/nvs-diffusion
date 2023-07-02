@@ -218,7 +218,7 @@ class SDSDataset:
 
         self.H = config.height
         self.W = config.width
-        self.max_iter = config.max_iter
+        self.max_iter = max_iter
 
         # self.mode = mode # train, val, test
         # self.training = self.mode in ['train', 'all']
