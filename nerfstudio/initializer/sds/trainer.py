@@ -83,6 +83,8 @@ class SDSTrainerConfig(InstantiateConfig):
     """Whether to use fp16"""
     iters: int = 30000
     """Total number of iterations to train for"""
+    sds_save_dir: str = "sds_vis/"
+    """Directory to save sds visualization"""
 
 
 class SDSTrainer:
@@ -96,8 +98,8 @@ class SDSTrainer:
         self.device = device
         self.iters = config.iters
         self.fp16 = config.fp16
-        self.time_stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-        self.workspace = os.path.join('sds_vis/', self.time_stamp)
+        self.time_stamp = time.strftime("%m%d-%H%M%S")
+        self.workspace = os.path.join(config.sds_save_dir, self.time_stamp)
         self.save_guidance_path = os.path.join(self.workspace, 'guidance')
         os.makedirs(self.workspace, exist_ok=True)
         os.makedirs(self.save_guidance_path, exist_ok=True)

@@ -257,7 +257,7 @@ class VanillaPipeline(Pipeline):
         self.gen_data = gen_data
         self.use_sds = use_sds
 
-        self.timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        self.timestamp = datetime.now().strftime("%m%d-%H%M%S")
         self.data_gen_dir = Path(os.path.join(self.config.datamanager.data, self.timestamp))
         self.data_gen_dir.mkdir(exist_ok=True, parents=True)
 

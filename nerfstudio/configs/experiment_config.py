@@ -91,7 +91,7 @@ class ExperimentConfig(InstantiateConfig):
     def set_timestamp(self) -> None:
         """Dynamically set the experiment timestamp"""
         if self.timestamp == "{timestamp}":
-            self.timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            self.timestamp = datetime.now().strftime("%m%d-%H%M%S")
 
     def set_experiment_name(self) -> None:
         """Dynamically set the experiment name"""

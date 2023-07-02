@@ -330,7 +330,7 @@ class VanillaDataManagerConfig(DataManagerConfig):
     """Size of patch to sample from. If >1, patch-based sampling will be used."""
     data_gen_dir: Optional[Path] = None
     """Directory to save generated data to. If None, will not save generated data."""
-    do_eval: bool = True
+    do_eval: bool = False
     """Whether to run eval."""
 
 

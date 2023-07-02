@@ -98,7 +98,7 @@ class Text2RoomInitializer(Initializer):
 
         self.out_path = 'text2room_vis/'
 
-        now_str = datetime.now().strftime('%Y-%m-%d_%H:%M:%S.%fZ')
+        now_str = datetime.now().strftime('%m%d-%H%M%S')
         self.out_path = os.path.join(self.out_path, now_str)
         os.makedirs(self.out_path, exist_ok=True)
 

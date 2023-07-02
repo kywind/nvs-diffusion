@@ -354,7 +354,7 @@ class ViewerState:
         self.vis["renderingState/data_base_dir"].write(str(self.datapath))
 
         # get the timestamp of the train run to set default export path name
-        timestamp_reg = re.compile("[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{6}")
+        timestamp_reg = re.compile("[0-9]{4}-[0-9]{6}")
         timestamp_match = timestamp_reg.findall(str(self.log_filename.parents[0]))
         self.vis["renderingState/export_path"].write(timestamp_match[-1])
 

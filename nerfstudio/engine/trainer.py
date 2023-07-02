@@ -215,8 +215,18 @@ class Trainer:
         )
 
         self._init_viewer_state()
+        num_iterations = self.config.max_num_iterations
+
+        if num_iterations == 0:  # only visualize
+            self._update_viewer_state(self._start_step)
+            CONSOLE.rule()
+            CONSOLE.print("[bold green]:tada: :tada: :tada: Training Finished :tada: :tada: :tada:", justify="center")
+            if not self.config.viewer.quit_on_train_completion:
+                CONSOLE.print("Use ctrl+c to quit", justify="center")
+                self._always_render(self._start_step)
+            return
+
         with TimeWriter(writer, EventName.TOTAL_TRAIN_TIME):
-            num_iterations = self.config.max_num_iterations
             step = 0
             for step in range(self._start_step, self._start_step + num_iterations):
                 with TimeWriter(writer, EventName.ITER_TRAIN_TIME, step=step) as train_t:
