@@ -1,21 +1,18 @@
-import os
-import cv2
-import glob
-import json
-import tqdm
 import random
 import numpy as np
 from scipy.spatial.transform import Slerp, Rotation
-
-import trimesh
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+import trimesh
 
 from nerfstudio.initializer.sds.utils.utils import get_rays, safe_normalize
 from nerfstudio.cameras.cameras import Cameras, CameraType
 from nerfstudio.cameras.rays import RayBundle
+from nerfstudio.configs.base_config import InstantiateConfig
 
 DIR_COLORS = np.array([
     [255, 0, 0, 255], # front
@@ -181,11 +178,24 @@ def circle_poses(device, radius=torch.tensor([3.2]), theta=torch.tensor([60]), p
 
     return poses, dirs
 
+@dataclass
+class SDSDatasetConfig(InstantiateConfig):
+    """Configuration for model instantiation"""
+
+    _target: Type = field(default_factory=lambda: SDSDataset)
+    """target class to instantiate"""
+    height: int = 64
+    """image height"""
+    width: int = 64
+    """image width"""
 
 class SDSDataset:
-    def __init__(self, device, mode='train', H=32, W=32, epoch_length=100):
-        super().__init__()
-
+    def __init__(
+        self, 
+        config,
+        device: str = "cuda",
+        max_iter: int = 10000,
+    ):
         self.batch_size = 1
         self.min_near = 0.01
         self.angle_overhead = 30
@@ -205,12 +215,12 @@ class SDSDataset:
         self.phi_range = [-180, 180]
 
         self.device = device
-        self.mode = mode # train, val, test
 
-        self.H = H
-        self.W = W
-        self.epoch_length = epoch_length
+        self.H = config.height
+        self.W = config.width
+        self.max_iter = config.max_iter
 
+        # self.mode = mode # train, val, test
         # self.training = self.mode in ['train', 'all']
 
         self.cx = self.H / 2
@@ -321,7 +331,7 @@ class SDSDataset:
 
     def dataloader(self, batch_size=None):
         batch_size = batch_size or self.batch_size
-        loader = DataLoader(list(range(self.epoch_length)), batch_size=batch_size, 
+        loader = DataLoader(list(range(self.max_iter)), batch_size=batch_size, 
             collate_fn=self.collate, shuffle=True, num_workers=0)
             # collate_fn=self.collate, shuffle=self.training, num_workers=0)
         loader._data = self

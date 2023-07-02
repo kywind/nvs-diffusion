@@ -79,6 +79,10 @@ class SDSTrainerConfig(InstantiateConfig):
 
     _target: Type = field(default_factory=lambda: SDSTrainer)
     """target class to instantiate"""
+    fp16: bool = True
+    """Whether to use fp16"""
+    iters: int = 30000
+    """Total number of iterations to train for"""
 
 
 class SDSTrainer:
@@ -87,13 +91,11 @@ class SDSTrainer:
         config,
         model, # network
         device: str = "cuda", # device
-        iters: int = 30000, # total iters
-        fp16: bool = False, # amp optimize level
     ):
-        self.config = config
+        # self.config = config
         self.device = device
-        self.iters = iters
-        self.fp16 = fp16
+        self.iters = config.iters
+        self.fp16 = config.fp16
         self.time_stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
         self.workspace = os.path.join('sds_vis/', self.time_stamp)
         self.save_guidance_path = os.path.join(self.workspace, 'guidance')

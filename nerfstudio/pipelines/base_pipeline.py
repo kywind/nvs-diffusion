@@ -53,10 +53,9 @@ from nerfstudio.inpainter.stable_diffusion import StableDiffusionInpainter
 from nerfstudio.inpainter.image_to_image import ImageToImageInpainter
 from nerfstudio.camera_generator.base_camera_generator import CameraGenerator, CameraGeneratorConfig
 from nerfstudio.initializer.base_initializer import Initializer, InitializerConfig
+from nerfstudio.initializer.sds.dataset import SDSDataset, SDSDatasetConfig
 from nerfstudio.initializer.sds.trainer import SDSTrainer, SDSTrainerConfig
 from nerfstudio.cameras.cameras import Cameras, CameraType
-
-from nerfstudio.initializer.sds.dataset import SDSDataset
 
 import os
 import numpy as np
@@ -217,6 +216,8 @@ class VanillaPipelineConfig(cfg.InstantiateConfig):
     """specifies the camera generator config"""
     initializer: InitializerConfig = InitializerConfig()
     """specifies the initializer config"""
+    sds_dataset: SDSDatasetConfig = SDSDatasetConfig()
+    """specifies the sds dataset config"""
     sds_trainer: SDSTrainerConfig = SDSTrainerConfig()
     """specifies the sds trainer config"""
 
@@ -301,11 +302,14 @@ class VanillaPipeline(Pipeline):
 
         # TODO SDS Loss
         if self.use_sds:
-            self.sds_train_loader = SDSDataset(device=device, mode='train', epoch_length=max_iter).dataloader()
+            self.sds_dataset = config.sds_dataset.setup(
+                device=device,
+                max_iter=max_iter
+            )
+            self.sds_dataloader = self.sds_dataset.dataloader()
             self.sds_trainer = config.sds_trainer.setup(
                 model=self.model,
                 device=device,
-                fp16=True,
             )
 
         self.world_size = world_size
