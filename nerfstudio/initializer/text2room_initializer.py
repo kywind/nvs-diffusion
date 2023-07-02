@@ -415,7 +415,7 @@ class Text2RoomInitializer(Initializer):
         # construct depth model
         self.iron_depth_type = 'scannet'
         self.iron_depth_iters = 20
-        self.models_path = 'nerfstudio/initializer/text2room/checkpoints/'
+        self.models_path = 'checkpoints/'
         self.iron_depth_n_net, self.iron_depth_model = load_iron_depth_model(
             self.iron_depth_type, 
             self.iron_depth_iters, 

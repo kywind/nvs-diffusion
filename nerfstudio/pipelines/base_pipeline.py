@@ -344,7 +344,11 @@ class VanillaPipeline(Pipeline):
                 )
 
         loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
-        # import ipdb; ipdb.set_trace()
+
+        # for key in loss_dict.keys():
+        #     if loss_dict[key].isnan().any():
+        #         import ipdb; ipdb.set_trace()
+        
         # loss_dict: dict_keys(['rgb_loss', 'interlevel_loss', 'distortion_loss', 'depth_loss'])
         # model_outputs: dict_keys(['rgb', 'accumulation', 'depth', 'weights_list', 'ray_samples_list', 'prop_depth_0', 'prop_depth_1', 'directions_norm'])
         # metrics_dict: dict_keys(['psnr', 'distortion', 'depth_loss', 'camera_opt_translation', 'camera_opt_rotation'])
