@@ -230,7 +230,7 @@ class Text2RoomInitializer(Initializer):
             self.world_to_cam = self.trajectory_fn(pos, self.n_images).to(self.device)
             self.seen_poses.append(self.world_to_cam.clone())
             # render --> inpaint --> add to 3D structure
-            if offset == 0:
+            if pos == 0 and offset == 0:
                 _ = self.setup_start_image(offset)
             else:
                 self.project_and_inpaint(pos, offset, save_files=True)
