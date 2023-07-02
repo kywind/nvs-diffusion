@@ -258,18 +258,19 @@ class VanillaPipeline(Pipeline):
         self.use_sds = use_sds
 
         self.timestamp = datetime.now().strftime("%m%d-%H%M%S")
-        self.data_gen_dir = Path(os.path.join(self.config.datamanager.data, self.timestamp))
-        self.data_gen_dir.mkdir(exist_ok=True, parents=True)
 
         if self.gen_data:
+            self.data_gen_dir = Path(os.path.join(self.config.datamanager.data, self.timestamp))
+            self.data_gen_dir.mkdir(exist_ok=True, parents=True)
             self.config.datamanager.data_gen_dir = self.data_gen_dir
-        
+
             # initializing stage
             self.initializer = config.initializer.setup(
                 initialize_save_dir=self.data_gen_dir
             )
             self.initializer.initialize_scene()
         else:
+            self.data_gen_dir = None
             self.config.datamanager.data_gen_dir = None
 
         self.datamanager: VanillaDataManager = config.datamanager.setup(

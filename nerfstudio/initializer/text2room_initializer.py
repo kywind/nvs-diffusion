@@ -62,6 +62,12 @@ class Text2RoomInitializerConfig(InitializerConfig):
     """target class to instantiate"""
     n_images: int = 19
     """number of images to generate per trajectory"""
+    trajectory_file: Path = Path("nerfstudio/initializer/trajectories/living_room_1.json")
+    """path to trajectory file"""
+    initial_prompt: str = "living room with a lit furnace, couch and cozy curtains, bright lamps that make the room look well-lit"
+    """initial prompt for generating the first image"""
+    initial_neg_prompt: str = "blurry, bad art, blurred, text, watermark, plant, nature"
+    """initial negative prompt for generating the first image"""
 
 
 class Text2RoomInitializer(Initializer):
@@ -123,12 +129,11 @@ class Text2RoomInitializer(Initializer):
         if "prompt" in kwargs:
             prompt = kwargs["prompt"]
         else:
-            prompt = "living room with a lit furnace, couch and cozy curtains, bright lamps that make the room look well-lit"
+            prompt = self.config.initial_prompt
 
         self.orig_n_images = self.config.n_images
         self.orig_prompt = prompt
-        self.orig_prompt = prompt
-        self.orig_negative_prompt = "blurry, bad art, blurred, text, watermark, plant, nature"
+        self.orig_negative_prompt = self.config.initial_neg_prompt
         self.orig_surface_normal_threshold = 0.1
         
         self.n_images = self.orig_n_images
@@ -150,7 +155,6 @@ class Text2RoomInitializer(Initializer):
         self.blur_radius = 0.0
         self.faces_per_pixel = 8
 
-
         self.rendered_depth = torch.zeros((self.H, self.W), device=self.device)  # depth rendered from point cloud
         self.inpaint_mask = torch.ones((self.H, self.W), device=self.device, dtype=torch.bool)  # 1: no projected points (need to be inpainted) | 0: have projected points
         self.vertices = torch.empty((3, 0), device=self.device)
@@ -168,7 +172,7 @@ class Text2RoomInitializer(Initializer):
         self.seen_poses = []
         offset = 0
 
-        traj_file = 'nerfstudio/initializer/trajectories/room.json'
+        traj_file = self.config.trajectory_file
         trajectories = json.load(open(traj_file, "r"))
 
         self.json_file = self.build_nerf_transforms_header()
@@ -183,7 +187,7 @@ class Text2RoomInitializer(Initializer):
 
         # ---------- MAIN LOOP -----------
         self.setup_models()
-        offset = self.setup_start_image(offset)
+        # offset = self.setup_start_image(offset)
 
         for t in trajectories:
             self.set_trajectory(t)
@@ -226,7 +230,10 @@ class Text2RoomInitializer(Initializer):
             self.world_to_cam = self.trajectory_fn(pos, self.n_images).to(self.device)
             self.seen_poses.append(self.world_to_cam.clone())
             # render --> inpaint --> add to 3D structure
-            self.project_and_inpaint(pos, offset, save_files=True)
+            if offset == 0:
+                _ = self.setup_start_image(offset)
+            else:
+                self.project_and_inpaint(pos, offset, save_files=True)
             if self.clean_mesh_every_nth > 0 and (pos + offset) % self.clean_mesh_every_nth == 0:
                 self.vertices, self.faces, self.colors = clean_mesh(
                     vertices=self.vertices,
@@ -423,7 +430,7 @@ class Text2RoomInitializer(Initializer):
             self.device
         )
 
-    def setup_start_image(self, offset, save_file=True, file_suffix="start"):
+    def setup_start_image(self, offset, save_file=False, file_suffix="_start"):
         """
         setup the start image with torch.eye pose
         """
@@ -457,7 +464,7 @@ class Text2RoomInitializer(Initializer):
             self.append_nerf_extrinsic(offset, self.current_image_pil, self.predicted_depth, self.current_depth_pil)
         # save image
         if save_file:
-            image_util.save_image(self.current_image_pil, f"rgb{file_suffix}", offset, self.rgb_path)
+            image_util.save_image(self.current_image_pil, f"rgb{file_suffix}", 0, self.rgb_path)
 
         del pipe
         return offset

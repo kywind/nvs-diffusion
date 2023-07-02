@@ -46,7 +46,8 @@ class CameraGenerator:
         self.config = config
         self.camera_count = 0
         self.inpaint_save_dir = inpaint_save_dir
-        os.makedirs(self.inpaint_save_dir, exist_ok=True)
+        if self.inpaint_save_dir is not None:
+            os.makedirs(self.inpaint_save_dir, exist_ok=True)
         
 
     def generate_inpaint_cameras(self, step: int, num_inpaint_images: int,
