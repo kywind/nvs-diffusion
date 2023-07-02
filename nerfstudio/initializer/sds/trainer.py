@@ -192,7 +192,7 @@ class SDSTrainer:
         #     shading = 'lambertian'
 
         # random weights binarization (like mobile-nerf) [NOT WORKING NOW]
-        # binarize_thresh = min(0.5, -0.5 + self.global_step / self.iters)
+        # binarize_thresh = min(0.5, -0.5 + step / self.iters)
         # binarize = random.random() < binarize_thresh
         # binarize = False
 
@@ -210,6 +210,7 @@ class SDSTrainer:
             'image': model_outputs['rgb'].reshape(H, W, 3),
             'depth': model_outputs['depth'].reshape(H, W),
             'weights_sum': model_outputs['accumulation'].reshape(H, W),
+            'weights': model_outputs['weights_list'][-1].reshape(H, W, -1),
             'normal_image': model_outputs['pred_normals'].reshape(H, W, 3) if 'pred_normals' in model_outputs else None,
         }
 
@@ -262,17 +263,21 @@ class SDSTrainer:
         loss = loss + self.guidance['IF'].train_step(text_z, pred_rgb, 
             guidance_scale=self.guidance_scale, grad_scale=self.lambda_guidance)
 
+        sds_metrics = {}
+
         # regularizations
         if self.lambda_opacity > 0:
             loss_opacity = (outputs['weights_sum'] ** 2).mean()
             loss = loss + self.lambda_opacity * loss_opacity
+            sds_metrics['sds_loss_opacity'] = loss_opacity
 
         if self.lambda_entropy > 0:
             alphas = outputs['weights'].clamp(1e-5, 1 - 1e-5)
             # alphas = alphas ** 2 # skewed entropy, favors 0 over 1
             loss_entropy = (- alphas * torch.log2(alphas) - (1 - alphas) * torch.log2(1 - alphas)).mean()
-            lambda_entropy = self.lambda_entropy * min(1, 2 * self.global_step / self.iters)
+            lambda_entropy = self.lambda_entropy * min(1, 2 * step / self.iters)
             loss = loss + lambda_entropy * loss_entropy
+            sds_metrics['sds_loss_entropy'] = loss_entropy
 
         if self.lambda_2d_normal_smooth > 0 and 'normal_image' in outputs:
             # pred_vals = outputs['normal_image'].reshape(B, H, W, 3).permute(0, 3, 1, 2).contiguous()
@@ -282,21 +287,22 @@ class SDSTrainer:
             loss_smooth = (pred_normal[:, 1:, :, :] - pred_normal[:, :-1, :, :]).square().mean() + \
                           (pred_normal[:, :, 1:, :] - pred_normal[:, :, :-1, :]).square().mean()
             loss = loss + self.lambda_2d_normal_smooth * loss_smooth
+            sds_metrics['sds_loss_smooth'] = loss_smooth
 
         if self.lambda_orient > 0 and 'loss_orient' in outputs:
             loss_orient = outputs['loss_orient']
             loss = loss + self.lambda_orient * loss_orient
+            sds_metrics['sds_loss_orient'] = loss_orient
 
         if self.lambda_3d_normal_smooth > 0 and 'loss_normal_perturb' in outputs:
             loss_normal_perturb = outputs['loss_normal_perturb']
             loss = loss + self.lambda_3d_normal_smooth * loss_normal_perturb
+            sds_metrics['sds_loss_normal_perturb'] = loss_normal_perturb
         
         # return pred_rgb, pred_depth, loss
         
         sds_loss_dict = {'sds_loss': loss}
         sds_outputs = {'sds_pred_rgb': pred_rgb, 'sds_pred_depth': pred_depth, 'sds_pred_mask': pred_mask}
-        sds_metrics = {'sds_loss_opacity': loss_opacity, 'sds_loss_entropy': loss_entropy, 
-            'sds_loss_smooth': loss_smooth, 'sds_loss_orient': loss_orient, 'sds_loss_normal_perturb': loss_normal_perturb}
 
         return sds_loss_dict, sds_outputs, sds_metrics
 

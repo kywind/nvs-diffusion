@@ -358,7 +358,7 @@ class VanillaPipeline(Pipeline):
         # model_outputs: dict_keys(['rgb', 'accumulation', 'depth', 'weights_list', 'ray_samples_list', 'prop_depth_0', 'prop_depth_1', 'directions_norm'])
         # metrics_dict: dict_keys(['psnr', 'distortion', 'depth_loss', 'camera_opt_translation', 'camera_opt_rotation'])
         if self.use_sds:
-            data = next(self.sds_train_loader) # H, W, rays_o, rays_d, dir, mvp, polar, azimuth, radius
+            data = next(self.sds_dataloader) # H, W, rays_o, rays_d, dir, mvp, polar, azimuth, radius
             sds_loss_dict, sds_outputs, sds_metrics = self.sds_trainer.train_step(step, data)
         
             loss_dict.update(sds_loss_dict)
