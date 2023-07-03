@@ -1,8 +1,4 @@
 import os
-import glob
-import tqdm
-import imageio
-import random
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
@@ -85,6 +81,8 @@ class SDSTrainerConfig(InstantiateConfig):
     """Total number of iterations to train for"""
     sds_save_dir: str = "sds_vis/"
     """Directory to save sds visualization"""
+    access_token: str = "none"
+    """Access token for DeepFloyd huggingface model hub"""
 
 
 class SDSTrainer:
@@ -114,7 +112,7 @@ class SDSTrainer:
         self.model = model
 
         guidance = nn.ModuleDict()
-        guidance['IF'] = IF(device, vram_O=True, t_range=[0.2, 0.6])
+        guidance['IF'] = IF(device, vram_O=True, t_range=[0.2, 0.6], access_token=config.access_token)
 
         self.guidance = guidance
         self.embeddings = {}
@@ -309,7 +307,7 @@ class SDSTrainer:
 
     def save_guidance_images(self, step):
         img = self.guidance_images
-        img = img.permute(0, 2, 3, 1).contiguous().cpu().numpy()
+        img = img.contiguous().detach().cpu().numpy() * 255
         save_path = os.path.join(self.save_guidance_path, f'step_{step:07d}.png')
-        imageio.imwrite(save_path, img)
+        cv2.imwrite(save_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 

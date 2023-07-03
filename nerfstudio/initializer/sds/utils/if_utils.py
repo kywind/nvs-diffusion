@@ -34,7 +34,7 @@ def seed_everything(seed):
 
 
 class IF(nn.Module):
-    def __init__(self, device, vram_O, t_range=[0.02, 0.98]):
+    def __init__(self, device, vram_O, t_range=[0.02, 0.98], access_token=None):
         super().__init__()
 
         self.device = device
@@ -46,7 +46,8 @@ class IF(nn.Module):
         is_torch2 = torch.__version__[0] == '2'
 
         # Create model
-        pipe = IFPipeline.from_pretrained(model_key, variant="fp16", torch_dtype=torch.float16)
+        pipe = IFPipeline.from_pretrained(model_key, variant="fp16", torch_dtype=torch.float16, 
+            use_auth_token=access_token)
         if not is_torch2:
             pipe.enable_xformers_memory_efficient_attention()
 
