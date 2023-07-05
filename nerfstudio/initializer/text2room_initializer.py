@@ -457,11 +457,11 @@ class Text2RoomInitializer(Initializer):
         save_first_frame = True
         if save_first_frame:
             self.add_next_image(pos=0, offset=offset)
-            offset += 1
             # add to seen poses
             self.seen_poses.append(self.world_to_cam.clone())
             # update dataset
             self.append_nerf_extrinsic(offset, self.current_image_pil, self.predicted_depth, self.current_depth_pil)
+            offset += 1
         # save image
         if save_file:
             image_util.save_image(self.current_image_pil, f"rgb{file_suffix}", 0, self.rgb_path)
