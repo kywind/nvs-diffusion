@@ -142,6 +142,8 @@ class SDSTrainer:
         self.lambda_2d_normal_smooth = 0
         self.lambda_3d_normal_smooth = 20
 
+        self.guidance_images = None
+
         print(f'[INFO] Trainer: {self.time_stamp} | {self.device} | {"fp16" if self.fp16 else "fp32"} | {self.workspace}')
         print(f'[INFO] #parameters: {sum([p.numel() for p in model.parameters() if p.requires_grad])}')
 
@@ -307,6 +309,8 @@ class SDSTrainer:
 
     def save_guidance_images(self, step):
         img = self.guidance_images
+        if img is None:
+            return
         img = img.contiguous().detach().cpu().numpy() * 255
         save_path = os.path.join(self.save_guidance_path, f'step_{step:07d}.png')
         cv2.imwrite(save_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))

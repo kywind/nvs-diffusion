@@ -118,7 +118,10 @@ class IF(nn.Module):
         grad = torch.nan_to_num(grad)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(images, grad)
+        # loss = SpecifyGradient.apply(images, grad)
+
+        target = (images - grad).detach()
+        loss = 0.5 * F.mse_loss(images, target, reduction="mean")
 
         return loss
 

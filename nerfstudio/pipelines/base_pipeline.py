@@ -312,6 +312,7 @@ class VanillaPipeline(Pipeline):
                 model=self.model,
                 device=device,
             )
+            self.sds_start_step = 2000
 
         self.world_size = world_size
         if world_size > 1:
@@ -357,7 +358,7 @@ class VanillaPipeline(Pipeline):
         # loss_dict: dict_keys(['rgb_loss', 'interlevel_loss', 'distortion_loss', 'depth_loss'])
         # model_outputs: dict_keys(['rgb', 'accumulation', 'depth', 'weights_list', 'ray_samples_list', 'prop_depth_0', 'prop_depth_1', 'directions_norm'])
         # metrics_dict: dict_keys(['psnr', 'distortion', 'depth_loss', 'camera_opt_translation', 'camera_opt_rotation'])
-        if self.use_sds:
+        if self.use_sds and step > self.sds_start_step:
             data = next(self.sds_dataloader) # H, W, rays_o, rays_d, dir, mvp, polar, azimuth, radius
             sds_loss_dict, sds_outputs, sds_metrics = self.sds_trainer.train_step(step, data)
         
