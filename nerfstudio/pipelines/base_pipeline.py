@@ -304,6 +304,7 @@ class VanillaPipeline(Pipeline):
         # TODO SDS Loss
         if self.use_sds:
             self.sds_dataset = config.sds_dataset.setup(
+                datamanager=self.datamanager,
                 device=device,
                 max_iter=max_iter
             )
@@ -312,7 +313,14 @@ class VanillaPipeline(Pipeline):
                 model=self.model,
                 device=device,
             )
-            self.sds_start_step = 2000
+            self.sds_start_step = config.sds_trainer.sds_start_step
+            self.sds_end_step = config.sds_trainer.sds_end_step
+            self.nerf_start_step = config.sds_trainer.nerf_start_step
+            self.nerf_end_step = config.sds_trainer.nerf_end_step
+            if self.sds_end_step == -1:
+                self.sds_end_step = max_iter
+            if self.nerf_end_step == -1:
+                self.enrf_end_step = max_iter
 
         self.world_size = world_size
         if world_size > 1:
@@ -333,32 +341,35 @@ class VanillaPipeline(Pipeline):
         Args:
             step: current iteration step to update sampler if using DDP (distributed)
         """
-        ray_bundle, batch = self.datamanager.next_train(step)
-        # import ipdb; ipdb.set_trace()
-        model_outputs = self.model(ray_bundle, step)
-        metrics_dict = self.model.get_metrics_dict(model_outputs, batch)
+        if (not self.use_sds) or \
+                (self.use_sds and step >= self.nerf_start_step and step < self.nerf_end_step):
+            ray_bundle, batch = self.datamanager.next_train(step)
+            model_outputs = self.model(ray_bundle, step)
+            metrics_dict = self.model.get_metrics_dict(model_outputs, batch)
 
-        if self.config.datamanager.camera_optimizer is not None:
-            camera_opt_param_group = self.config.datamanager.camera_optimizer.param_group
-            if camera_opt_param_group in self.datamanager.get_param_groups():
-                # Report the camera optimization metrics
-                metrics_dict["camera_opt_translation"] = (
-                    self.datamanager.get_param_groups()[camera_opt_param_group][0].data[:, :3].norm()
-                )
-                metrics_dict["camera_opt_rotation"] = (
-                    self.datamanager.get_param_groups()[camera_opt_param_group][0].data[:, 3:].norm()
-                )
+            if self.config.datamanager.camera_optimizer is not None:
+                camera_opt_param_group = self.config.datamanager.camera_optimizer.param_group
+                if camera_opt_param_group in self.datamanager.get_param_groups():
+                    # Report the camera optimization metrics
+                    metrics_dict["camera_opt_translation"] = (
+                        self.datamanager.get_param_groups()[camera_opt_param_group][0].data[:, :3].norm()
+                    )
+                    metrics_dict["camera_opt_rotation"] = (
+                        self.datamanager.get_param_groups()[camera_opt_param_group][0].data[:, 3:].norm()
+                    )
 
-        loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
+            loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
 
-        # for key in loss_dict.keys():
-        #     if loss_dict[key].isnan().any():
-        #         import ipdb; ipdb.set_trace()
+        else:
+            loss_dict = {}
+            model_outputs = {}
+            metrics_dict = {}
         
         # loss_dict: dict_keys(['rgb_loss', 'interlevel_loss', 'distortion_loss', 'depth_loss'])
         # model_outputs: dict_keys(['rgb', 'accumulation', 'depth', 'weights_list', 'ray_samples_list', 'prop_depth_0', 'prop_depth_1', 'directions_norm'])
         # metrics_dict: dict_keys(['psnr', 'distortion', 'depth_loss', 'camera_opt_translation', 'camera_opt_rotation'])
-        if self.use_sds and step > self.sds_start_step:
+
+        if self.use_sds and step >= self.sds_start_step and step < self.sds_end_step:
             data = next(self.sds_dataloader) # H, W, rays_o, rays_d, dir, mvp, polar, azimuth, radius
             sds_loss_dict, sds_outputs, sds_metrics = self.sds_trainer.train_step(step, data)
         
@@ -366,6 +377,7 @@ class VanillaPipeline(Pipeline):
             model_outputs.update(sds_outputs)
             metrics_dict.update(sds_metrics)
         
+        assert loss_dict != {}
         return model_outputs, loss_dict, metrics_dict
 
     def inpaint(self, step: int, num_inpaint_cameras: int):

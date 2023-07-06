@@ -108,22 +108,22 @@ class IF(nn.Module):
             noise_pred_uncond, _ = noise_pred_uncond.split(model_input.shape[1], dim=1)
             noise_pred_text, predicted_variance = noise_pred_text.split(model_input.shape[1], dim=1)
             noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
-
+            # TODO why we need/not need this type transform?
+            # noise_pred = noise_pred.to(images.dtype)
             # TODO: how to use the variance here?
             # noise_pred = torch.cat([noise_pred, predicted_variance], dim=1)
 
         # w(t), sigma_t^2
         w = (1 - self.alphas[t])
-        grad = grad_scale * w[:, None, None, None] * (noise_pred - noise)
+        grad = w[:, None, None, None] * (noise_pred - noise)
         grad = torch.nan_to_num(grad)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
         # loss = SpecifyGradient.apply(images, grad)
+        target = (images.detach() - grad).detach()
+        loss = 0.5 * grad_scale * F.mse_loss(images, target, reduction="mean")
 
-        target = (images - grad).detach()
-        loss = 0.5 * F.mse_loss(images, target, reduction="mean")
-
-        return loss
+        return loss, target
 
     @torch.no_grad()
     def produce_imgs(self, text_embeddings, height=64, width=64, num_inference_steps=50, guidance_scale=7.5):

@@ -83,6 +83,14 @@ class SDSTrainerConfig(InstantiateConfig):
     """Directory to save sds visualization"""
     access_token: str = "none"
     """Access token for DeepFloyd huggingface model hub"""
+    sds_start_step: int = 2000
+    """Start step for sds training"""
+    sds_end_step: int = -1
+    """End step for sds training"""
+    nerf_start_step: int = 0
+    """Start step for nerf training"""
+    nerf_end_step: int = -1
+    """End step for nerf training"""
 
 
 class SDSTrainer:
@@ -135,14 +143,15 @@ class SDSTrainer:
         # variable init
         self.bg_radius = -1
         self.guidance_scale = 20
-        self.lambda_guidance = 1
+        self.lambda_guidance = 0.5
         self.lambda_opacity = 0
-        self.lambda_entropy = 1
+        self.lambda_entropy = 0.1
         self.lambda_orient = 1
         self.lambda_2d_normal_smooth = 0
-        self.lambda_3d_normal_smooth = 20
+        self.lambda_3d_normal_smooth = 0
 
         self.guidance_images = None
+        self.target_images = None
 
         print(f'[INFO] Trainer: {self.time_stamp} | {self.device} | {"fp16" if self.fp16 else "fp32"} | {self.workspace}')
         print(f'[INFO] #parameters: {sum([p.numel() for p in model.parameters() if p.requires_grad])}')
@@ -204,7 +213,6 @@ class SDSTrainer:
         #     bg_color = torch.rand(3).to(self.device) # single color random bg
 
         # TODO
-        # import ipdb; ipdb.set_trace()
         model_outputs = self.model(ray_bundle, step)
         outputs = {
             'image': model_outputs['rgb'].reshape(H, W, 3),
@@ -260,9 +268,11 @@ class SDSTrainer:
             text_z.append(r * start_z + (1 - r) * end_z)
         text_z = torch.cat(text_z, dim=0)
 
-        loss = loss + self.guidance['IF'].train_step(text_z, pred_rgb, 
+        sds_loss, target_image = self.guidance['IF'].train_step(text_z, pred_rgb, 
             guidance_scale=self.guidance_scale, grad_scale=self.lambda_guidance)
 
+        loss = loss + sds_loss
+        self.target_images = (target_image[0].permute(1, 2, 0) + 1) / 2.
         sds_metrics = {}
 
         # regularizations
@@ -309,9 +319,13 @@ class SDSTrainer:
 
     def save_guidance_images(self, step):
         img = self.guidance_images
-        if img is None:
+        tgt = self.target_images
+        if img is None or tgt is None:
             return
         img = img.contiguous().detach().cpu().numpy() * 255
         save_path = os.path.join(self.save_guidance_path, f'step_{step:07d}.png')
         cv2.imwrite(save_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        tgt = tgt.contiguous().detach().cpu().numpy() * 255
+        save_path = os.path.join(self.save_guidance_path, f'step_{step:07d}_tgt.png')
+        cv2.imwrite(save_path, cv2.cvtColor(tgt, cv2.COLOR_RGB2BGR))
 
