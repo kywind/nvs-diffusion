@@ -77,13 +77,11 @@ class SDSTrainerConfig(InstantiateConfig):
     """target class to instantiate"""
     fp16: bool = True
     """Whether to use fp16"""
-    iters: int = 30000
-    """Total number of iterations to train for"""
     sds_save_dir: str = "sds_vis/"
     """Directory to save sds visualization"""
     access_token: str = "none"
     """Access token for DeepFloyd huggingface model hub"""
-    sds_start_step: int = 2000
+    sds_start_step: int = 1000
     """Start step for sds training"""
     sds_end_step: int = -1
     """End step for sds training"""
@@ -91,6 +89,20 @@ class SDSTrainerConfig(InstantiateConfig):
     """Start step for nerf training"""
     nerf_end_step: int = -1
     """End step for nerf training"""
+    guidance_scale: float = 20
+    """Guidance scale"""
+    lambda_guidance: float = 0.5
+    """Guidance loss weight"""
+    lambda_opacity: float = 0
+    """Opacity loss weight"""
+    lambda_entropy: float = 0.1
+    """Entropy loss weight"""
+    lambda_orient: float = 0
+    """Orientation loss weight"""
+    lambda_2d_normal_smooth: float = 0
+    """2D normal smooth loss weight"""
+    lambda_3d_normal_smooth: float = 0
+    """3D normal smooth loss weight"""
 
 
 class SDSTrainer:
@@ -98,11 +110,12 @@ class SDSTrainer:
         self,
         config,
         model, # network
+        iters, # total iterations
         device: str = "cuda", # device
     ):
         # self.config = config
         self.device = device
-        self.iters = config.iters
+        self.iters = iters
         self.fp16 = config.fp16
         self.time_stamp = time.strftime("%m%d-%H%M%S")
         self.workspace = os.path.join(config.sds_save_dir, self.time_stamp)
@@ -141,14 +154,14 @@ class SDSTrainer:
         # self.scaler = torch.cuda.amp.GradScaler(enabled=self.fp16)
 
         # variable init
-        self.bg_radius = -1
-        self.guidance_scale = 20
-        self.lambda_guidance = 0.5
-        self.lambda_opacity = 0
-        self.lambda_entropy = 0.1
-        self.lambda_orient = 1
-        self.lambda_2d_normal_smooth = 0
-        self.lambda_3d_normal_smooth = 0
+        # self.bg_radius = -1
+        self.guidance_scale = config.guidance_scale
+        self.lambda_guidance = config.lambda_guidance
+        self.lambda_opacity = config.lambda_opacity
+        self.lambda_entropy = config.lambda_entropy
+        self.lambda_orient = config.lambda_orient
+        self.lambda_2d_normal_smooth = config.lambda_2d_normal_smooth
+        self.lambda_3d_normal_smooth = config.lambda_3d_normal_smooth
 
         self.guidance_images = None
         self.target_images = None
@@ -268,18 +281,18 @@ class SDSTrainer:
             text_z.append(r * start_z + (1 - r) * end_z)
         text_z = torch.cat(text_z, dim=0)
 
-        sds_loss, target_image = self.guidance['IF'].train_step(text_z, pred_rgb, 
+        guidance_loss, target_image = self.guidance['IF'].train_step(text_z, pred_rgb, 
             guidance_scale=self.guidance_scale, grad_scale=self.lambda_guidance)
 
-        loss = loss + sds_loss
+        loss = loss + guidance_loss
         self.target_images = (target_image[0].permute(1, 2, 0) + 1) / 2.
-        sds_metrics = {}
+        sds_metrics = {'sds_loss_guidance': guidance_loss}
 
         # regularizations
         if self.lambda_opacity > 0:
             loss_opacity = (outputs['weights_sum'] ** 2).mean()
             loss = loss + self.lambda_opacity * loss_opacity
-            sds_metrics['sds_loss_opacity'] = loss_opacity
+            sds_metrics['sds_loss_opacity'] = self.lambda_opacity * loss_opacity
 
         if self.lambda_entropy > 0:
             alphas = outputs['weights'].clamp(1e-5, 1 - 1e-5)
@@ -287,7 +300,8 @@ class SDSTrainer:
             loss_entropy = (- alphas * torch.log2(alphas) - (1 - alphas) * torch.log2(1 - alphas)).mean()
             lambda_entropy = self.lambda_entropy * min(1, 2 * step / self.iters)
             loss = loss + lambda_entropy * loss_entropy
-            sds_metrics['sds_loss_entropy'] = loss_entropy
+            sds_metrics['sds_lambda_entropy'] = lambda_entropy
+            sds_metrics['sds_loss_entropy'] = lambda_entropy * loss_entropy
 
         if self.lambda_2d_normal_smooth > 0 and 'normal_image' in outputs:
             # pred_vals = outputs['normal_image'].reshape(B, H, W, 3).permute(0, 3, 1, 2).contiguous()
@@ -297,7 +311,7 @@ class SDSTrainer:
             loss_smooth = (pred_normal[:, 1:, :, :] - pred_normal[:, :-1, :, :]).square().mean() + \
                           (pred_normal[:, :, 1:, :] - pred_normal[:, :, :-1, :]).square().mean()
             loss = loss + self.lambda_2d_normal_smooth * loss_smooth
-            sds_metrics['sds_loss_smooth'] = loss_smooth
+            sds_metrics['sds_loss_smooth'] = self.lambda_2d_normal_smooth * loss_smooth
 
         if self.lambda_orient > 0 and 'loss_orient' in outputs:
             loss_orient = outputs['loss_orient']
@@ -307,7 +321,7 @@ class SDSTrainer:
         if self.lambda_3d_normal_smooth > 0 and 'loss_normal_perturb' in outputs:
             loss_normal_perturb = outputs['loss_normal_perturb']
             loss = loss + self.lambda_3d_normal_smooth * loss_normal_perturb
-            sds_metrics['sds_loss_normal_perturb'] = loss_normal_perturb
+            sds_metrics['sds_loss_normal_perturb'] = self.lambda_3d_normal_smooth * loss_normal_perturb
         
         # return pred_rgb, pred_depth, loss
         

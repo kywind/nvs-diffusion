@@ -309,10 +309,7 @@ class VanillaPipeline(Pipeline):
                 max_iter=max_iter
             )
             self.sds_dataloader = self.sds_dataset.dataloader()
-            self.sds_trainer = config.sds_trainer.setup(
-                model=self.model,
-                device=device,
-            )
+
             self.sds_start_step = config.sds_trainer.sds_start_step
             self.sds_end_step = config.sds_trainer.sds_end_step
             self.nerf_start_step = config.sds_trainer.nerf_start_step
@@ -320,7 +317,13 @@ class VanillaPipeline(Pipeline):
             if self.sds_end_step == -1:
                 self.sds_end_step = max_iter
             if self.nerf_end_step == -1:
-                self.enrf_end_step = max_iter
+                self.nerf_end_step = max_iter
+
+            self.sds_trainer = config.sds_trainer.setup(
+                model=self.model,
+                iters=self.sds_end_step - self.sds_start_step,
+                device=device,
+            )
 
         self.world_size = world_size
         if world_size > 1:
