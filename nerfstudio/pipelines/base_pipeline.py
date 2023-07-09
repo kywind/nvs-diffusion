@@ -243,6 +243,7 @@ class VanillaPipeline(Pipeline):
         self,
         config: VanillaPipelineConfig,
         device: str,
+        timestamp: str,
         test_mode: Literal["test", "val", "inference"] = "val",
         world_size: int = 1,
         local_rank: int = 0,
@@ -257,7 +258,8 @@ class VanillaPipeline(Pipeline):
         self.gen_data = gen_data
         self.use_sds = use_sds
 
-        self.timestamp = datetime.now().strftime("%m%d-%H%M%S")
+        self.timestamp = timestamp
+        # self.timestamp = datetime.now().strftime("%m%d-%H%M%S")
 
         if self.gen_data:
             self.data_gen_dir = Path(os.path.join(self.config.datamanager.data, self.timestamp))
@@ -266,7 +268,8 @@ class VanillaPipeline(Pipeline):
 
             # initializing stage
             self.initializer = config.initializer.setup(
-                initialize_save_dir=self.data_gen_dir
+                initialize_save_dir=self.data_gen_dir,
+                timestamp=self.timestamp,
             )
             self.initializer.initialize_scene()
         else:
@@ -320,6 +323,7 @@ class VanillaPipeline(Pipeline):
                 self.nerf_end_step = max_iter
 
             self.sds_trainer = config.sds_trainer.setup(
+                timestamp=self.timestamp,
                 model=self.model,
                 iters=self.sds_end_step - self.sds_start_step,
                 device=device,

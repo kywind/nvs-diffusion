@@ -151,7 +151,8 @@ class Trainer:
                 'inference': does not load any dataset into memory
         """
         self.pipeline = self.config.pipeline.setup(
-            device=self.device, test_mode=test_mode, world_size=self.world_size, local_rank=self.local_rank, 
+            device=self.device, timestamp=self.config.timestamp, 
+            test_mode=test_mode, world_size=self.world_size, local_rank=self.local_rank, 
             gen_data=self.config.gen_data, use_sds=self.config.use_sds,
             max_num_cameras=self.config.max_num_cameras, max_iter=self.config.max_num_iterations
         )

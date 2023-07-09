@@ -111,13 +111,14 @@ class SDSTrainer:
         config,
         model, # network
         iters, # total iterations
+        timestamp, # timestamp
         device: str = "cuda", # device
     ):
         # self.config = config
         self.device = device
         self.iters = iters
         self.fp16 = config.fp16
-        self.time_stamp = time.strftime("%m%d-%H%M%S")
+        self.time_stamp = timestamp
         self.workspace = os.path.join(config.sds_save_dir, self.time_stamp)
         self.save_guidance_path = os.path.join(self.workspace, 'guidance')
         os.makedirs(self.workspace, exist_ok=True)

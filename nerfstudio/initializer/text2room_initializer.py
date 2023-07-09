@@ -80,6 +80,7 @@ class Text2RoomInitializer(Initializer):
     def __init__(
         self,
         config: Text2RoomInitializerConfig, 
+        timestamp: str,
         initialize_save_dir: str = None, 
         device: str = "cuda",
     ) -> None:
@@ -87,6 +88,7 @@ class Text2RoomInitializer(Initializer):
 
         self.config = config
         self.device = device
+        self.timestamp = timestamp
         self.initialize_save_dir = initialize_save_dir
 
 
@@ -104,8 +106,8 @@ class Text2RoomInitializer(Initializer):
 
         self.out_path = 'text2room_vis/'
 
-        now_str = datetime.now().strftime('%m%d-%H%M%S')
-        self.out_path = os.path.join(self.out_path, now_str)
+        # timestamp = datetime.now().strftime('%m%d-%H%M%S')
+        self.out_path = os.path.join(self.out_path, self.timestamp)
         os.makedirs(self.out_path, exist_ok=True)
 
         self.rgb_path = os.path.join(self.out_path, "rgb")
