@@ -126,12 +126,8 @@ def rand_poses(size, device, base_cameras, radius_range=[1, 1.5], theta_range=[0
 
     up_vector = safe_normalize(torch.cross(right_vector, forward_vector, dim=-1) + up_noise)
     poses = torch.eye(4, dtype=torch.float, device=device)
-    poses[:3, :3] = torch.stack((right_vector, up_vector, forward_vector), dim=1)
-    xx = poses[:3, 0].clone()
-    zz = poses[:3, 2].clone()
-    poses[:3, 0] = zz
-    poses[:3, 2] = xx
-    poses[:3, 3] = centers
+    poses[:3, :3] = torch.stack((right_vector, up_vector, -forward_vector), dim=1)  # dim=1: world to cam, dim=2: cam to world
+    poses[:3, 3] = -centers.mm(poses[:3, :3].clone().T)
     poses = convert_pose_to_nerf_convention(poses).to(torch.float32)
     poses = poses.unsqueeze(0).repeat(size, 1, 1)
 

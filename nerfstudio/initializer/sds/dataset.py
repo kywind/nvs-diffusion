@@ -1,3 +1,4 @@
+from pathlib import Path
 import random
 import numpy as np
 from scipy.spatial.transform import Slerp, Rotation
@@ -68,7 +69,7 @@ class SDSDataset:
         self.far = 1000 # infinite
 
         self.datamanager = datamanager
-
+        self.count = 0
         ## visualize poses
         # poses, dirs, _, _, _ = rand_poses(100, self.device, 
         #     radius_range=self.radius_range, angle_overhead=self.angle_overhead, 
@@ -133,6 +134,32 @@ class SDSDataset:
             camera_to_worlds=poses[:, :3, :4],
             camera_type=CameraType.PERSPECTIVE,
         )
+        ## DEBUG
+        # if self.count % 10 == 0:
+        if False:
+            # import ipdb; ipdb.set_trace()
+            orig_cameras = self.datamanager.train_dataset.cameras
+            n = orig_cameras.camera_to_worlds.shape[0]
+            self.datamanager.train_dataset.cameras = Cameras(
+                fx=orig_cameras.fx[-1],
+                fy=orig_cameras.fy[-1],
+                cx=orig_cameras.cx[-1],
+                cy=orig_cameras.cy[-1],
+                height=orig_cameras.height[-1],
+                width=orig_cameras.width[-1],
+                camera_to_worlds=torch.cat((orig_cameras.camera_to_worlds, 
+                    poses[:, :3, :4].to(orig_cameras.camera_to_worlds.device)), dim=0),
+                camera_type=CameraType.PERSPECTIVE,
+            )
+            self.datamanager.train_dataset._dataparser_outputs.cameras = self.datamanager.train_dataset.cameras
+            # dummy image
+            self.datamanager.train_dataset.depth_filenames.append(
+                Path('data/text2room_generate/test/0702-171330/00001_depth.png'))
+            self.datamanager.train_dataset._dataparser_outputs.image_filenames.append(
+                Path('data/text2room_generate/test/0702-171330/00001.png'))
+            
+            self.datamanager.setup_train()
+        self.count += 1
         # import ipdb; ipdb.set_trace()
         # c = ray_indices[:, 0]  # camera indices
         # y = ray_indices[:, 1]  # row indices
