@@ -325,7 +325,8 @@ class VanillaPipeline(Pipeline):
             self.sds_trainer = config.sds_trainer.setup(
                 timestamp=self.timestamp,
                 model=self.model,
-                iters=self.sds_end_step - self.sds_start_step,
+                sds_iters=self.sds_end_step - self.sds_start_step,
+                total_iters=max_iter,
                 device=device,
             )
 

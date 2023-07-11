@@ -106,19 +106,24 @@ class SDSTrainerConfig(InstantiateConfig):
     """3D normal smooth loss weight"""
     guidance_method: str = "IF"
     """Guidance methods"""
+    latent_iter_ratio: float = 0
+    """Ratio of iterations to use latent guidance"""
 
 class SDSTrainer:
     def __init__(
         self,
         config,
         model, # network
-        iters, # total iterations
+        sds_iters, # sds iterations
+        total_iters, # total iterations
         timestamp, # timestamp
         device: str = "cuda", # device
     ):
         # self.config = config
         self.device = device
-        self.iters = iters
+        self.sds_iters = sds_iters
+        self.total_iters = total_iters
+        self.latent_iter_ratio = config.latent_iter_ratio
         self.fp16 = config.fp16
         self.time_stamp = timestamp
         self.guidance_method = config.guidance_method
@@ -264,6 +269,11 @@ class SDSTrainer:
 
         pred_rgb = outputs['image'].reshape(B, H, W, 3).permute(0, 3, 1, 2).contiguous() # [B, 3, H, W]
 
+        as_latent = self.guidance_method == 'SD' and step * 1. / self.total_iters < self.latent_iter_ratio
+        if as_latent:
+            # abuse normal & mask as latent code for faster geometry initialization (ref: fantasia3D)
+            pred_rgb = torch.cat([pred_rgb, pred_mask], dim=1).contiguous() # [B, 4, H, W]
+
         # novel view loss
         loss = 0
         # interpolate text_z
@@ -289,7 +299,7 @@ class SDSTrainer:
         text_z = torch.cat(text_z, dim=0)
 
         guidance_loss, target_image = self.guidance.train_step(text_z, pred_rgb, 
-            guidance_scale=self.guidance_scale, grad_scale=self.lambda_guidance)
+            guidance_scale=self.guidance_scale, grad_scale=self.lambda_guidance, as_latent=as_latent)
 
         loss = loss + guidance_loss
         self.target_images = target_image[0].permute(1, 2, 0)
@@ -305,7 +315,7 @@ class SDSTrainer:
             alphas = outputs['weights'].clamp(1e-5, 1 - 1e-5)
             # alphas = alphas ** 2 # skewed entropy, favors 0 over 1
             loss_entropy = (- alphas * torch.log2(alphas) - (1 - alphas) * torch.log2(1 - alphas)).mean()
-            lambda_entropy = self.lambda_entropy * min(1, 2 * step / self.iters)
+            lambda_entropy = self.lambda_entropy * min(1, 2 * step / self.sds_iters)
             loss = loss + lambda_entropy * loss_entropy
             sds_metrics['sds_lambda_entropy'] = lambda_entropy
             sds_metrics['sds_loss_entropy'] = lambda_entropy * loss_entropy

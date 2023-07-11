@@ -85,7 +85,7 @@ class IF(nn.Module):
         return embeddings
 
 
-    def train_step(self, text_embeddings, pred_rgb, guidance_scale=100, grad_scale=1):
+    def train_step(self, text_embeddings, pred_rgb, guidance_scale=100, grad_scale=1, **kwargs):
 
         # [0, 1] to [-1, 1] and make sure shape is [64, 64]
         images = F.interpolate(pred_rgb, (64, 64), mode='bilinear', align_corners=False) * 2 - 1
