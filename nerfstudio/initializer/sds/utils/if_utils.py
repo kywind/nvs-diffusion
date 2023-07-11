@@ -123,7 +123,8 @@ class IF(nn.Module):
         target = (images.detach() - grad).detach()
         loss = 0.5 * grad_scale * F.mse_loss(images, target, reduction="mean")
 
-        return loss, target
+        target_image = (target / 2 + 0.5).clamp(0, 1)
+        return loss, target_image
 
     @torch.no_grad()
     def produce_imgs(self, text_embeddings, height=64, width=64, num_inference_steps=50, guidance_scale=7.5):

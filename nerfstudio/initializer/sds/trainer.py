@@ -22,6 +22,7 @@ from torch_ema import ExponentialMovingAverage
 
 from nerfstudio.configs.base_config import InstantiateConfig
 from nerfstudio.initializer.sds.utils.if_utils import IF
+from nerfstudio.initializer.sds.utils.sd_utils import StableDiffusion
 # from nerfstudio.initializer.sds.utils.utils import get_CPU_mem, get_GPU_mem
 # from nerfstudio.initializer.sds.utils.optimizer import Adan
 
@@ -103,7 +104,8 @@ class SDSTrainerConfig(InstantiateConfig):
     """2D normal smooth loss weight"""
     lambda_3d_normal_smooth: float = 0
     """3D normal smooth loss weight"""
-
+    guidance_method: str = "IF"
+    """Guidance methods"""
 
 class SDSTrainer:
     def __init__(
@@ -119,6 +121,7 @@ class SDSTrainer:
         self.iters = iters
         self.fp16 = config.fp16
         self.time_stamp = timestamp
+        self.guidance_method = config.guidance_method
         self.workspace = os.path.join(config.sds_save_dir, self.time_stamp)
         self.save_guidance_path = os.path.join(self.workspace, 'guidance')
         os.makedirs(self.workspace, exist_ok=True)
@@ -134,14 +137,16 @@ class SDSTrainer:
         self.model = model
 
         guidance = nn.ModuleDict()
-        guidance['IF'] = IF(device, vram_O=True, t_range=[0.2, 0.6], access_token=config.access_token)
+        if self.guidance_method == 'IF':
+            guidance = IF(device, vram_O=True, t_range=[0.2, 0.6], access_token=config.access_token)
+        elif self.guidance_method == 'SD':
+            guidance = StableDiffusion(device, vram_O=True, t_range=[0.2, 0.6], access_token=config.access_token)
 
         self.guidance = guidance
+        for p in self.guidance.parameters():
+            p.requires_grad = False
+
         self.embeddings = {}
-        for key in self.guidance:
-            for p in self.guidance[key].parameters():
-                p.requires_grad = False
-            self.embeddings[key] = {}
         self.prepare_embeddings()
 
         # self.pearson = PearsonCorrCoef().to(self.device)
@@ -174,20 +179,24 @@ class SDSTrainer:
     @torch.no_grad()
     def prepare_embeddings(self):
         # text embeddings (stable-diffusion)
-        if 'SD' in self.guidance:
-            self.embeddings['SD']['default'] = self.guidance['SD'].get_text_embeds([self.prompt])
-            self.embeddings['SD']['uncond'] = self.guidance['SD'].get_text_embeds([self.negative_prompt])
+        if self.guidance_method == 'SD':
+            self.embeddings['default'] = self.guidance.get_text_embeds([self.prompt])
+            self.embeddings['uncond'] = self.guidance.get_text_embeds([self.negative_prompt])
             for d in ['front', 'side', 'back']:
-                self.embeddings['SD'][d] = self.guidance['SD'].get_text_embeds([f"{self.prompt}, {d} view"])
+                self.embeddings[d] = self.guidance.get_text_embeds([f"{self.prompt}, {d} view"])
 
-        if 'IF' in self.guidance:
-            self.embeddings['IF']['default'] = self.guidance['IF'].get_text_embeds([self.prompt])
-            self.embeddings['IF']['uncond'] = self.guidance['IF'].get_text_embeds([self.negative_prompt])
+        elif self.guidance_method == 'IF':
+            self.embeddings['default'] = self.guidance.get_text_embeds([self.prompt])
+            self.embeddings['uncond'] = self.guidance.get_text_embeds([self.negative_prompt])
             for d in ['front', 'side', 'back']:
-                self.embeddings['IF'][d] = self.guidance['IF'].get_text_embeds([f"{self.prompt}, {d} view"])
+                self.embeddings[d] = self.guidance.get_text_embeds([f"{self.prompt}, {d} view"])
 
-        if 'clip' in self.guidance:
-            self.embeddings['clip']['text'] = self.guidance['clip'].get_text_embeds(self.prompt)
+        elif self.guidance_method == 'CLIP':
+            raise NotImplementedError
+            self.embeddings['text'] = self.guidance.get_text_embeds(self.prompt)
+        
+        else:
+            raise ValueError(f'Guidance method {self.guidance_method} not supported.')
 
 
     def train_step(self, step, data, save_guidance_path=None):
@@ -257,36 +266,33 @@ class SDSTrainer:
 
         # novel view loss
         loss = 0
-        # if 'SD' in self.guidance:
-        # if 'IF' in self.guidance:
         # interpolate text_z
         azimuth = data['azimuth'] # [-180, 180]
-
         # ENHANCE: remove loop to handle batch size > 1
-        text_z = [self.embeddings['IF']['uncond']] * azimuth.shape[0]
+        text_z = [self.embeddings['uncond']] * azimuth.shape[0]
         for b in range(azimuth.shape[0]):
             if azimuth[b] >= -90 and azimuth[b] < 90:
                 if azimuth[b] >= 0:
                     r = 1 - azimuth[b] / 90
                 else:
                     r = 1 + azimuth[b] / 90
-                start_z = self.embeddings['IF']['front']
-                end_z = self.embeddings['IF']['side']
+                start_z = self.embeddings['front']
+                end_z = self.embeddings['side']
             else:
                 if azimuth[b] >= 0:
                     r = 1 - (azimuth[b] - 90) / 90
                 else:
                     r = 1 + (azimuth[b] + 90) / 90
-                start_z = self.embeddings['IF']['side']
-                end_z = self.embeddings['IF']['back']
+                start_z = self.embeddings['side']
+                end_z = self.embeddings['back']
             text_z.append(r * start_z + (1 - r) * end_z)
         text_z = torch.cat(text_z, dim=0)
 
-        guidance_loss, target_image = self.guidance['IF'].train_step(text_z, pred_rgb, 
+        guidance_loss, target_image = self.guidance.train_step(text_z, pred_rgb, 
             guidance_scale=self.guidance_scale, grad_scale=self.lambda_guidance)
 
         loss = loss + guidance_loss
-        self.target_images = (target_image[0].permute(1, 2, 0) + 1) / 2.
+        self.target_images = target_image[0].permute(1, 2, 0)
         sds_metrics = {'sds_loss_guidance': guidance_loss}
 
         # regularizations
