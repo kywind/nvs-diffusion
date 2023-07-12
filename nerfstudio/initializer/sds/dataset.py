@@ -26,6 +26,22 @@ class SDSDatasetConfig(InstantiateConfig):
     """image height"""
     width: int = 64
     """image width"""
+    fovy_min: float = 40
+    """minimum fovy"""
+    fovy_max: float = 60
+    """maximum fovy"""
+    radius_min: float = 0.5
+    """minimum radius"""
+    radius_max: float = 0.6
+    """maximum radius"""
+    theta_min: float = 90
+    """minimum theta"""
+    theta_max: float = 90
+    """maximum theta"""
+    phi_min: float = -180
+    """minimum phi"""
+    phi_max: float = 180
+    """maximum phi"""
 
 class SDSDataset:
     def __init__(
@@ -41,17 +57,17 @@ class SDSDataset:
         self.angle_front = 60
         self.jitter_pose = False
         self.uniform_sphere_rate = 0
-        self.known_view_scale = 1.5
+        # self.known_view_scale = 1.5
 
-        self.default_radius = 3.2
-        self.default_fovy = 20
+        # self.default_radius = 3.2
+        # self.default_fovy = 20
         self.default_polar = 90
         self.default_azimuth = 0
 
-        self.fovy_range = [40, 60]
-        self.radius_range = [0.5, 0.6]
-        self.theta_range = [90, 90]
-        self.phi_range = [-180, 180]
+        self.fovy_range = [config.fovy_min, config.fovy_max]
+        self.radius_range = [config.radius_min, config.radius_max]
+        self.theta_range = [config.theta_min, config.theta_max]
+        self.phi_range = [config.phi_min, config.phi_max]
 
         self.device = device
 
@@ -120,7 +136,7 @@ class SDSDataset:
         delta_polar = thetas - self.default_polar
         delta_azimuth = phis - self.default_azimuth
         delta_azimuth[delta_azimuth > 180] -= 360 # range in [-180, 180]
-        delta_radius = radius - self.default_radius
+        # delta_radius = radius - self.default_radius
 
         # distortion_params = torch.stack(distort, dim=0)[idx_tensor]
 
@@ -179,7 +195,7 @@ class SDSDataset:
             'W': self.W,
             'polar': delta_polar,
             'azimuth': delta_azimuth,
-            'radius': delta_radius,
+            # 'radius': delta_radius,
         }
         # import ipdb; ipdb.set_trace()
 
