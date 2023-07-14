@@ -143,9 +143,9 @@ class SDSTrainer:
 
         guidance = nn.ModuleDict()
         if self.guidance_method == 'IF':
-            guidance = IF(device, vram_O=True, t_range=[0.2, 0.6], access_token=config.access_token)
+            guidance = IF(device, vram_O=True, t_range=[0.02, 0.5], access_token=config.access_token)
         elif self.guidance_method == 'SD':
-            guidance = StableDiffusion(device, vram_O=True, t_range=[0.2, 0.6], access_token=config.access_token)
+            guidance = StableDiffusion(device, vram_O=True, t_range=[0.02, 0.5], access_token=config.access_token)
 
         self.guidance = guidance
         for p in self.guidance.parameters():
@@ -298,8 +298,16 @@ class SDSTrainer:
             text_z.append(r * start_z + (1 - r) * end_z)
         text_z = torch.cat(text_z, dim=0)
 
+        if step >= 45000:  # TODO remove hardcode
+            min_t = 0.02
+            max_t = 0.2
+        else:
+            min_t = None
+            max_t = None
+
         guidance_loss, target_image = self.guidance.train_step(text_z, pred_rgb, 
-            guidance_scale=self.guidance_scale, grad_scale=self.lambda_guidance, as_latent=as_latent)
+            guidance_scale=self.guidance_scale, grad_scale=self.lambda_guidance, as_latent=as_latent,
+            min_t=min_t, max_t=max_t)
 
         loss = loss + guidance_loss
         self.target_images = target_image[0].permute(1, 2, 0)

@@ -85,12 +85,16 @@ class IF(nn.Module):
         return embeddings
 
 
-    def train_step(self, text_embeddings, pred_rgb, guidance_scale=100, grad_scale=1, **kwargs):
+    def train_step(self, text_embeddings, pred_rgb, guidance_scale=100, grad_scale=1, min_t=None, max_t=None, **kwargs):
 
         # [0, 1] to [-1, 1] and make sure shape is [64, 64]
         images = F.interpolate(pred_rgb, (64, 64), mode='bilinear', align_corners=False) * 2 - 1
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
+        if min_t is not None:
+            self.min_step = int(self.num_train_timesteps * min_t)
+        if max_t is not None:
+            self.max_step = int(self.num_train_timesteps * max_t)
         t = torch.randint(self.min_step, self.max_step + 1, (images.shape[0],), dtype=torch.long, device=self.device)
 
         # predict the noise residual with unet, NO grad!
