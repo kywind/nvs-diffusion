@@ -42,6 +42,8 @@ class SDSDatasetConfig(InstantiateConfig):
     """minimum phi"""
     phi_max: float = 180
     """maximum phi"""
+    jitter_pose: bool = False
+    """jitter pose"""
 
 class SDSDataset:
     def __init__(
@@ -55,7 +57,7 @@ class SDSDataset:
         self.min_near = 0.01
         self.angle_overhead = 30
         self.angle_front = 60
-        self.jitter_pose = False
+        self.jitter_pose = config.jitter_pose
         self.uniform_sphere_rate = 0
         # self.known_view_scale = 1.5
 
