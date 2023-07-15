@@ -298,12 +298,12 @@ class SDSTrainer:
             text_z.append(r * start_z + (1 - r) * end_z)
         text_z = torch.cat(text_z, dim=0)
 
-        if step >= 45000:  # TODO remove hardcode
-            min_t = 0.02
-            max_t = 0.2
-        else:
-            min_t = None
-            max_t = None
+        # if step >= 45000:  # TODO remove hardcode
+        #     min_t = 0.02
+        #     max_t = 0.2
+        # else:
+        min_t = None
+        max_t = None
 
         guidance_loss, target_image = self.guidance.train_step(text_z, pred_rgb, 
             guidance_scale=self.guidance_scale, grad_scale=self.lambda_guidance, as_latent=as_latent,

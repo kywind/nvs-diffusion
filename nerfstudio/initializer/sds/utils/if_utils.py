@@ -91,11 +91,9 @@ class IF(nn.Module):
         images = F.interpolate(pred_rgb, (64, 64), mode='bilinear', align_corners=False) * 2 - 1
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
-        if min_t is not None:
-            self.min_step = int(self.num_train_timesteps * min_t)
-        if max_t is not None:
-            self.max_step = int(self.num_train_timesteps * max_t)
-        t = torch.randint(self.min_step, self.max_step + 1, (images.shape[0],), dtype=torch.long, device=self.device)
+        min_step = int(self.num_train_timesteps * min_t) if min_t is not None else self.min_step
+        max_step = int(self.num_train_timesteps * max_t) if max_t is not None else self.max_step
+        t = torch.randint(min_step, max_step + 1, (images.shape[0],), dtype=torch.long, device=self.device)
 
         # predict the noise residual with unet, NO grad!
         with torch.no_grad():
